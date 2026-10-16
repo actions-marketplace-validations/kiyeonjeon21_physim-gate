@@ -1,0 +1,257 @@
+{
+  "$defs": {
+    "Correction": {
+      "enum": [
+        "none",
+        "bonferroni"
+      ],
+      "title": "Correction",
+      "type": "string"
+    },
+    "Defaults": {
+      "additionalProperties": false,
+      "properties": {
+        "statistic": {
+          "$ref": "#/$defs/Statistic",
+          "default": "mean"
+        },
+        "confidence": {
+          "default": 0.95,
+          "exclusiveMaximum": 1.0,
+          "exclusiveMinimum": 0.5,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "min_samples": {
+          "default": 10,
+          "minimum": 2,
+          "title": "Min Samples",
+          "type": "integer"
+        },
+        "pairing": {
+          "$ref": "#/$defs/Pairing",
+          "default": "auto"
+        },
+        "max_missing_fraction": {
+          "default": 0.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Max Missing Fraction",
+          "type": "number"
+        },
+        "bootstrap_resamples": {
+          "default": 10000,
+          "maximum": 1000000,
+          "minimum": 1000,
+          "title": "Bootstrap Resamples",
+          "type": "integer"
+        },
+        "bootstrap_seed": {
+          "default": 0,
+          "title": "Bootstrap Seed",
+          "type": "integer"
+        }
+      },
+      "title": "Defaults",
+      "type": "object"
+    },
+    "Direction": {
+      "enum": [
+        "higher_is_better",
+        "lower_is_better"
+      ],
+      "title": "Direction",
+      "type": "string"
+    },
+    "MetricGate": {
+      "additionalProperties": false,
+      "description": "How one metric is gated. Unset optional fields fall back to ``defaults``.",
+      "properties": {
+        "max_absolute_degradation": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Absolute Degradation"
+        },
+        "max_relative_degradation": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Relative Degradation"
+        },
+        "direction": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Direction"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "required": {
+          "default": true,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "statistic": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Statistic"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "exclusiveMaximum": 1.0,
+              "exclusiveMinimum": 0.5,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "min_samples": {
+          "anyOf": [
+            {
+              "minimum": 2,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min Samples"
+        },
+        "pairing": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Pairing"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "max_missing_fraction": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Missing Fraction"
+        }
+      },
+      "title": "MetricGate",
+      "type": "object"
+    },
+    "OnUncertain": {
+      "enum": [
+        "fail",
+        "pass"
+      ],
+      "title": "OnUncertain",
+      "type": "string"
+    },
+    "Pairing": {
+      "enum": [
+        "auto",
+        "paired",
+        "unpaired"
+      ],
+      "title": "Pairing",
+      "type": "string"
+    },
+    "Policy": {
+      "additionalProperties": false,
+      "properties": {
+        "on_inconclusive": {
+          "$ref": "#/$defs/OnUncertain",
+          "default": "fail"
+        },
+        "on_invalid": {
+          "$ref": "#/$defs/OnUncertain",
+          "default": "fail"
+        },
+        "correction": {
+          "$ref": "#/$defs/Correction",
+          "default": "none"
+        },
+        "require_same_scenario": {
+          "default": true,
+          "title": "Require Same Scenario",
+          "type": "boolean"
+        }
+      },
+      "title": "Policy",
+      "type": "object"
+    },
+    "Statistic": {
+      "enum": [
+        "mean",
+        "median"
+      ],
+      "title": "Statistic",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1,
+      "default": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "defaults": {
+      "$ref": "#/$defs/Defaults"
+    },
+    "policy": {
+      "$ref": "#/$defs/Policy"
+    },
+    "metrics": {
+      "additionalProperties": {
+        "$ref": "#/$defs/MetricGate"
+      },
+      "minProperties": 1,
+      "title": "Metrics",
+      "type": "object"
+    }
+  },
+  "required": [
+    "metrics"
+  ],
+  "title": "GateConfig",
+  "type": "object"
+}

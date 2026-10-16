@@ -1,0 +1,37 @@
+# Synthetic run spec (physim-gate synthetic adapter). Not real simulator data.
+run_id: pick-place-grasp-1.4.0-pr-2291
+domain: robotics
+simulator: {name: physim-gate-synthetic, version: "1"}
+scenario: {id: tabletop_pick_and_place, version: "2026.09"}
+policy: {id: grasp-policy, version: 1.4.0}
+source: {repository: "https://example.com/acme/manipulation-stack.git", commit: 9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b, branch: refactor-grasp-planner, dirty: false}
+created_at: "2026-10-01T09:30:00Z"
+seed: 2291
+trials: 120
+first_trial_seed: 1000
+failure_probability: 0.01
+failure_kind: physics_instability
+metrics:
+  grasp_success:
+    distribution: bernoulli
+    direction: higher_is_better
+    description: Object lifted and placed inside the target region.
+    p: 0.915
+    correlation: 0.85
+    failure_value: 0
+  cycle_time:
+    direction: lower_is_better
+    unit: s
+    description: Time from first motion to release.
+    mean: 11.7
+    stdev: 1.4
+    min: 5
+    correlation: 0.7
+  peak_contact_force:
+    direction: lower_is_better
+    unit: N
+    description: Largest gripper contact force during the episode.
+    mean: 38.0
+    stdev: 4.0
+    min: 0
+    correlation: 0.6

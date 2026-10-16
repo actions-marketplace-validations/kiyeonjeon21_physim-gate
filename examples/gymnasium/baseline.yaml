@@ -1,0 +1,7 @@
+# Requires: pip install "physim-gate[gymnasium]". Run from the repository root with
+# PYTHONPATH=examples/gymnasium so that the policies module can be imported.
+env_id: CartPole-v1
+run_id: cartpole-baseline
+policy: policies:pole_angle_and_velocity
+episodes: 30
+first_seed: 0

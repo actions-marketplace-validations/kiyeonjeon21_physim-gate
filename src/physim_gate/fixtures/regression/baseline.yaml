@@ -1,0 +1,42 @@
+# Synthetic run spec (physim-gate synthetic adapter). Not real simulator data.
+run_id: highway-merge-planner-2.0.3-main-1187
+domain: autonomous_driving
+simulator: {name: physim-gate-synthetic, version: "1"}
+scenario: {id: highway_on_ramp_merge, version: "v7"}
+policy: {id: motion-planner, version: 2.0.3}
+source: {repository: "https://example.com/acme/av-planning.git", commit: 1f2e3d4c5b6a79881726354453627180a9b8c7d6, branch: main, dirty: false}
+created_at: "2026-10-02T03:00:00Z"
+seed: 1187
+trials: 80
+first_trial_seed: 5000
+metrics:
+  collision:
+    distribution: bernoulli
+    direction: lower_is_better
+    description: 1 if any contact with another agent occurred.
+    p: 0.02
+    correlation: 0.8
+  min_time_to_collision:
+    direction: higher_is_better
+    unit: s
+    description: Smallest time-to-collision to the lead or merging vehicle.
+    mean: 3.1
+    stdev: 0.5
+    min: 0
+    correlation: 0.7
+  lateral_error_rms:
+    direction: lower_is_better
+    unit: m
+    description: RMS lateral deviation from the reference path.
+    mean: 0.21
+    stdev: 0.05
+    min: 0
+    correlation: 0.6
+  jerk_p95:
+    direction: lower_is_better
+    unit: m/s^3
+    description: 95th percentile longitudinal jerk (comfort).
+    mean: 2.4
+    stdev: 0.35
+    min: 0
+    correlation: 0.6

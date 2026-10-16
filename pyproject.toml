@@ -1,0 +1,137 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "physim-gate"
+version = "0.1.0"
+description = "Test physical AI like software. Catch behavioral regressions in simulation results before deployment."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+authors = [{ name = "Kiyeon Jeon", email = "kiyeon.jeon.21@gmail.com" }]
+keywords = [
+  "robotics",
+  "simulation",
+  "regression-testing",
+  "embodied-ai",
+  "autonomous-driving",
+  "uav",
+  "ci",
+  "bootstrap",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Software Development :: Testing",
+  "Typing :: Typed",
+]
+dependencies = [
+  "pydantic>=2.7,<3",
+  "typer>=0.12",
+  "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+gymnasium = ["gymnasium>=1.0"]
+dev = [
+  "build>=1.2",
+  "mypy>=1.10",
+  "pytest>=8.0",
+  "pytest-cov>=5.0",
+  "ruff>=0.6",
+  "types-PyYAML>=6.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/kiyeonjeon21/physim-gate"
+Documentation = "https://github.com/kiyeonjeon21/physim-gate/tree/main/docs"
+Issues = "https://github.com/kiyeonjeon21/physim-gate/issues"
+
+[project.scripts]
+physim-gate = "physim_gate.cli:main"
+
+[project.entry-points."physim_gate.adapters"]
+json = "physim_gate.adapters.json_adapter:JsonAdapter"
+synthetic = "physim_gate.adapters.synthetic:SyntheticAdapter"
+gymnasium = "physim_gate.adapters.gymnasium:GymnasiumAdapter"
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/src",
+  "/tests",
+  "/docs",
+  "/examples",
+  "/schemas",
+  "/README.md",
+  "/LICENSE",
+  "/CHANGELOG.md",
+  "/CONTRIBUTING.md",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/physim_gate"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["examples/csv-adapter/build"]
+
+[tool.ruff.lint]
+select = [
+  "E",
+  "W",
+  "F",
+  "I",
+  "B",
+  "UP",
+  "SIM",
+  "RUF",
+  "PT",
+  "C4",
+  "PIE",
+  "RET",
+  "PTH",
+  "TID",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# The HTML report embeds its CSS and page template as long string literals.
+"src/physim_gate/reporting/html.py" = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["physim_gate"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+plugins = ["pydantic.mypy"]
+files = ["src"]
+
+[[tool.mypy.overrides]]
+module = ["gymnasium", "gymnasium.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-markers", "--strict-config"]
+xfail_strict = true
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+source = ["physim_gate"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

@@ -1,0 +1,20 @@
+# Gate for the pick-and-place scenario. See docs/comparison-semantics.md.
+version: 1
+defaults:
+  confidence: 0.95
+  min_samples: 30
+  # Failed trials report no cycle time or force. Tolerate a few missing values and gate the
+  # failure rate explicitly so crashes cannot hide behind the missing data.
+  max_missing_fraction: 0.05
+policy:
+  on_inconclusive: fail
+metrics:
+  grasp_success:
+    max_absolute_degradation: 0.05      # at most 5 percentage points lower
+  cycle_time:
+    max_relative_degradation: 0.05      # at most 5% slower
+  peak_contact_force:
+    max_absolute_degradation: 3.0       # newtons
+    max_relative_degradation: 0.10      # the stricter of the two applies
+  physim.failure_rate:
+    max_absolute_degradation: 0.05      # derived from trial status

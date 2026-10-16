@@ -1,0 +1,1163 @@
+{
+  "$defs": {
+    "Correction": {
+      "enum": [
+        "none",
+        "bonferroni"
+      ],
+      "title": "Correction",
+      "type": "string"
+    },
+    "Defaults": {
+      "additionalProperties": false,
+      "properties": {
+        "statistic": {
+          "$ref": "#/$defs/Statistic",
+          "default": "mean"
+        },
+        "confidence": {
+          "default": 0.95,
+          "exclusiveMaximum": 1.0,
+          "exclusiveMinimum": 0.5,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "min_samples": {
+          "default": 10,
+          "minimum": 2,
+          "title": "Min Samples",
+          "type": "integer"
+        },
+        "pairing": {
+          "$ref": "#/$defs/Pairing",
+          "default": "auto"
+        },
+        "max_missing_fraction": {
+          "default": 0.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Max Missing Fraction",
+          "type": "number"
+        },
+        "bootstrap_resamples": {
+          "default": 10000,
+          "maximum": 1000000,
+          "minimum": 1000,
+          "title": "Bootstrap Resamples",
+          "type": "integer"
+        },
+        "bootstrap_seed": {
+          "default": 0,
+          "title": "Bootstrap Seed",
+          "type": "integer"
+        }
+      },
+      "title": "Defaults",
+      "type": "object"
+    },
+    "Direction": {
+      "enum": [
+        "higher_is_better",
+        "lower_is_better"
+      ],
+      "title": "Direction",
+      "type": "string"
+    },
+    "Domain": {
+      "enum": [
+        "robotics",
+        "autonomous_driving",
+        "aerial",
+        "generic"
+      ],
+      "title": "Domain",
+      "type": "string"
+    },
+    "Environment": {
+      "additionalProperties": false,
+      "description": "The execution environment the run was produced in.",
+      "properties": {
+        "python": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Python"
+        },
+        "platform": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Platform"
+        },
+        "machine": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Machine"
+        },
+        "extra": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Extra",
+          "type": "object"
+        }
+      },
+      "title": "Environment",
+      "type": "object"
+    },
+    "Evidence": {
+      "description": "What the statistics support, independent of policy.",
+      "enum": [
+        "regression",
+        "non_inferior",
+        "inconclusive",
+        "insufficient_samples",
+        "not_evaluated"
+      ],
+      "title": "Evidence",
+      "type": "string"
+    },
+    "GateConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": 1,
+          "default": 1,
+          "title": "Version",
+          "type": "integer"
+        },
+        "defaults": {
+          "$ref": "#/$defs/Defaults"
+        },
+        "policy": {
+          "$ref": "#/$defs/Policy"
+        },
+        "metrics": {
+          "additionalProperties": {
+            "$ref": "#/$defs/MetricGate"
+          },
+          "minProperties": 1,
+          "title": "Metrics",
+          "type": "object"
+        }
+      },
+      "required": [
+        "metrics"
+      ],
+      "title": "GateConfig",
+      "type": "object"
+    },
+    "Identifier": {
+      "additionalProperties": false,
+      "description": "Identifies a scenario or a policy, optionally pinned to a version or checkpoint.",
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Version"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "Identifier",
+      "type": "object"
+    },
+    "InputRef": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        },
+        "sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sha256"
+        }
+      },
+      "title": "InputRef",
+      "type": "object"
+    },
+    "Inputs": {
+      "additionalProperties": false,
+      "properties": {
+        "baseline": {
+          "$ref": "#/$defs/InputRef"
+        },
+        "candidate": {
+          "$ref": "#/$defs/InputRef"
+        },
+        "config": {
+          "$ref": "#/$defs/InputRef"
+        },
+        "adapter": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Adapter"
+        }
+      },
+      "title": "Inputs",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "MetricComparison": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unit"
+        },
+        "direction": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Direction"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "required": {
+          "title": "Required",
+          "type": "boolean"
+        },
+        "statistic": {
+          "$ref": "#/$defs/Statistic"
+        },
+        "min_samples": {
+          "title": "Min Samples",
+          "type": "integer"
+        },
+        "pairing": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PairingInfo"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "baseline": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SampleSummary"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "candidate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SampleSummary"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "numerical": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Numerical"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "evidence": {
+          "$ref": "#/$defs/StatisticalEvidence"
+        },
+        "verdict": {
+          "$ref": "#/$defs/Verdict"
+        },
+        "blocking": {
+          "title": "Blocking",
+          "type": "boolean"
+        },
+        "reasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reasons",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "required",
+        "statistic",
+        "min_samples",
+        "evidence",
+        "verdict",
+        "blocking",
+        "reasons"
+      ],
+      "title": "MetricComparison",
+      "type": "object"
+    },
+    "MetricGate": {
+      "additionalProperties": false,
+      "description": "How one metric is gated. Unset optional fields fall back to ``defaults``.",
+      "properties": {
+        "max_absolute_degradation": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Absolute Degradation"
+        },
+        "max_relative_degradation": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Relative Degradation"
+        },
+        "direction": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Direction"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "required": {
+          "default": true,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "statistic": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Statistic"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "exclusiveMaximum": 1.0,
+              "exclusiveMinimum": 0.5,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "min_samples": {
+          "anyOf": [
+            {
+              "minimum": 2,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min Samples"
+        },
+        "pairing": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Pairing"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "max_missing_fraction": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Missing Fraction"
+        }
+      },
+      "title": "MetricGate",
+      "type": "object"
+    },
+    "Numerical": {
+      "additionalProperties": false,
+      "description": "Point estimates. ``degradation > 0`` always means the candidate is worse.",
+      "properties": {
+        "baseline": {
+          "title": "Baseline",
+          "type": "number"
+        },
+        "candidate": {
+          "title": "Candidate",
+          "type": "number"
+        },
+        "delta": {
+          "title": "Delta",
+          "type": "number"
+        },
+        "degradation": {
+          "title": "Degradation",
+          "type": "number"
+        },
+        "relative_degradation": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Relative Degradation"
+        },
+        "margin": {
+          "title": "Margin",
+          "type": "number"
+        },
+        "margin_basis": {
+          "title": "Margin Basis",
+          "type": "string"
+        },
+        "exceeds_margin": {
+          "title": "Exceeds Margin",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "baseline",
+        "candidate",
+        "delta",
+        "degradation",
+        "relative_degradation",
+        "margin",
+        "margin_basis",
+        "exceeds_margin"
+      ],
+      "title": "Numerical",
+      "type": "object"
+    },
+    "OnUncertain": {
+      "enum": [
+        "fail",
+        "pass"
+      ],
+      "title": "OnUncertain",
+      "type": "string"
+    },
+    "Pairing": {
+      "enum": [
+        "auto",
+        "paired",
+        "unpaired"
+      ],
+      "title": "Pairing",
+      "type": "string"
+    },
+    "PairingInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": [
+            "paired",
+            "unpaired"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "n_pairs": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "N Pairs"
+        },
+        "unmatched_baseline": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Unmatched Baseline",
+          "type": "array"
+        },
+        "unmatched_candidate": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Unmatched Candidate",
+          "type": "array"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": [
+        "mode"
+      ],
+      "title": "PairingInfo",
+      "type": "object"
+    },
+    "Policy": {
+      "additionalProperties": false,
+      "properties": {
+        "on_inconclusive": {
+          "$ref": "#/$defs/OnUncertain",
+          "default": "fail"
+        },
+        "on_invalid": {
+          "$ref": "#/$defs/OnUncertain",
+          "default": "fail"
+        },
+        "correction": {
+          "$ref": "#/$defs/Correction",
+          "default": "none"
+        },
+        "require_same_scenario": {
+          "default": true,
+          "title": "Require Same Scenario",
+          "type": "boolean"
+        }
+      },
+      "title": "Policy",
+      "type": "object"
+    },
+    "RunStatus": {
+      "enum": [
+        "completed",
+        "partial",
+        "failed"
+      ],
+      "title": "RunStatus",
+      "type": "string"
+    },
+    "RunSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "created_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Created At"
+        },
+        "domain": {
+          "$ref": "#/$defs/Domain"
+        },
+        "simulator": {
+          "$ref": "#/$defs/Simulator"
+        },
+        "scenario": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "environment": {
+          "$ref": "#/$defs/Environment"
+        },
+        "seeds": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Seeds",
+          "type": "array"
+        },
+        "status": {
+          "$ref": "#/$defs/RunStatus"
+        },
+        "n_trials": {
+          "title": "N Trials",
+          "type": "integer"
+        },
+        "n_trials_not_ok": {
+          "title": "N Trials Not Ok",
+          "type": "integer"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Labels",
+          "type": "object"
+        }
+      },
+      "required": [
+        "run_id",
+        "domain",
+        "simulator",
+        "scenario",
+        "source",
+        "environment",
+        "seeds",
+        "status",
+        "n_trials",
+        "n_trials_not_ok"
+      ],
+      "title": "RunSummary",
+      "type": "object"
+    },
+    "SampleSummary": {
+      "additionalProperties": false,
+      "description": "The observations of one metric in one run that entered the comparison.",
+      "properties": {
+        "n": {
+          "title": "N",
+          "type": "integer"
+        },
+        "n_trials": {
+          "title": "N Trials",
+          "type": "integer"
+        },
+        "n_missing": {
+          "title": "N Missing",
+          "type": "integer"
+        },
+        "mean": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mean"
+        },
+        "median": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Median"
+        },
+        "stdev": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stdev"
+        },
+        "min": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min"
+        },
+        "max": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max"
+        },
+        "values": {
+          "items": {
+            "type": "number"
+          },
+          "title": "Values",
+          "type": "array"
+        },
+        "trial_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Trial Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "n",
+        "n_trials",
+        "n_missing"
+      ],
+      "title": "SampleSummary",
+      "type": "object"
+    },
+    "Simulator": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Version"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "Simulator",
+      "type": "object"
+    },
+    "Source": {
+      "additionalProperties": false,
+      "description": "Where the code under test came from.",
+      "properties": {
+        "repository": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Repository"
+        },
+        "commit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Commit"
+        },
+        "branch": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Branch"
+        },
+        "dirty": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dirty"
+        }
+      },
+      "title": "Source",
+      "type": "object"
+    },
+    "Statistic": {
+      "enum": [
+        "mean",
+        "median"
+      ],
+      "title": "Statistic",
+      "type": "string"
+    },
+    "StatisticalEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "outcome": {
+          "$ref": "#/$defs/Evidence"
+        },
+        "method": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Method"
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "adjusted_confidence": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Adjusted Confidence"
+        },
+        "resamples": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resamples"
+        },
+        "seed": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seed"
+        },
+        "degradation_ci": {
+          "anyOf": [
+            {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Degradation Ci"
+        },
+        "excess_ci": {
+          "anyOf": [
+            {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Excess Ci"
+        }
+      },
+      "required": [
+        "outcome"
+      ],
+      "title": "StatisticalEvidence",
+      "type": "object"
+    },
+    "Tool": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "default": "physim-gate",
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "version"
+      ],
+      "title": "Tool",
+      "type": "object"
+    },
+    "Verdict": {
+      "enum": [
+        "PASS",
+        "FAIL",
+        "INCONCLUSIVE",
+        "INVALID"
+      ],
+      "title": "Verdict",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "kind": {
+      "const": "physim-gate.comparison",
+      "default": "physim-gate.comparison",
+      "title": "Kind",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "tool": {
+      "$ref": "#/$defs/Tool"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "inputs": {
+      "$ref": "#/$defs/Inputs"
+    },
+    "config": {
+      "$ref": "#/$defs/GateConfig"
+    },
+    "baseline": {
+      "$ref": "#/$defs/RunSummary"
+    },
+    "candidate": {
+      "$ref": "#/$defs/RunSummary"
+    },
+    "run_issues": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Run Issues",
+      "type": "array"
+    },
+    "run_blocking_issues": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Run Blocking Issues",
+      "type": "array"
+    },
+    "metrics": {
+      "items": {
+        "$ref": "#/$defs/MetricComparison"
+      },
+      "title": "Metrics",
+      "type": "array"
+    },
+    "untracked_metrics": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Untracked Metrics",
+      "type": "array"
+    },
+    "verdict": {
+      "$ref": "#/$defs/Verdict"
+    },
+    "exit_code": {
+      "title": "Exit Code",
+      "type": "integer"
+    },
+    "summary": {
+      "title": "Summary",
+      "type": "string"
+    }
+  },
+  "required": [
+    "tool",
+    "generated_at",
+    "inputs",
+    "config",
+    "baseline",
+    "candidate",
+    "run_issues",
+    "run_blocking_issues",
+    "metrics",
+    "untracked_metrics",
+    "verdict",
+    "exit_code",
+    "summary"
+  ],
+  "title": "ComparisonResult",
+  "type": "object"
+}

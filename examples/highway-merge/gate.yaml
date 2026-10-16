@@ -1,0 +1,15 @@
+# Gate for the highway merge scenario. See docs/comparison-semantics.md.
+version: 1
+defaults:
+  confidence: 0.95
+  min_samples: 30
+metrics:
+  collision:
+    max_absolute_degradation: 0.02      # collision rate may rise by at most 2 points
+  min_time_to_collision:
+    max_absolute_degradation: 0.2       # seconds
+  lateral_error_rms:
+    max_relative_degradation: 0.10
+  jerk_p95:
+    max_relative_degradation: 0.10
+    required: false                     # comfort is tracked, but does not block merges

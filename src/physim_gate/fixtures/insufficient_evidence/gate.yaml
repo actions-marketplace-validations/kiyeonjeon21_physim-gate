@@ -1,0 +1,9 @@
+# Gate for the gust hover scenario. Six flights per side are below min_samples.
+version: 1
+defaults:
+  min_samples: 20
+metrics:
+  position_rmse:
+    max_absolute_degradation: 0.03      # metres
+  battery_used:
+    max_relative_degradation: 0.05

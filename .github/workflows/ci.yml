@@ -1,0 +1,80 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install -e ".[dev]"
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: mypy
+
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python: ["3.11", "3.12", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install -e ".[dev]"
+      - run: python -m pytest --cov --cov-report=term
+      - name: Demo smoke test
+        run: physim-gate demo --output-dir "${{ runner.temp }}/demo"
+
+  extras:
+    # Optional integrations: Gymnasium (CPU only) and the example third-party adapter.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install -e ".[dev,gymnasium]" -e examples/csv-adapter
+      - run: python -m pytest tests/test_gymnasium.py tests/test_example_plugin.py
+      - name: Gymnasium example (expected to report a regression, exit code 1)
+        run: |
+          set +e
+          PYTHONPATH=examples/gymnasium physim-gate compare --adapter gymnasium \
+            -b examples/gymnasium/baseline.yaml -c examples/gymnasium/candidate.yaml \
+            -g examples/gymnasium/gate.yaml
+          test $? -eq 1
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install build
+      - run: python -m build
+      - name: Install the wheel into a clean environment and run the demo
+        run: |
+          python -m venv /tmp/wheel-env
+          /tmp/wheel-env/bin/pip install dist/*.whl
+          cd /tmp && /tmp/wheel-env/bin/physim-gate demo --output-dir /tmp/demo
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/

@@ -1,0 +1,8 @@
+version: 1
+defaults:
+  min_samples: 20
+metrics:
+  episode_return:
+    max_relative_degradation: 0.05
+  terminated:
+    max_absolute_degradation: 0.1

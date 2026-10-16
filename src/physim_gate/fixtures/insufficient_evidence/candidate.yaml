@@ -1,0 +1,28 @@
+# Synthetic run spec (physim-gate synthetic adapter). Not real simulator data.
+run_id: gust-hover-ctrl-0.10.0-pr-88
+domain: aerial
+simulator: {name: physim-gate-synthetic, version: "1"}
+scenario: {id: hover_in_gusts, version: "wind-12mps"}
+policy: {id: attitude-controller, version: 0.10.0}
+source: {repository: "https://example.com/acme/flight-control.git", commit: 89abcdef0123456789abcdef0123456789abcdef, branch: gain-schedule, dirty: true}
+created_at: "2026-10-03T06:45:00Z"
+seed: 88
+trials: 6
+first_trial_seed: 300
+metrics:
+  position_rmse:
+    direction: lower_is_better
+    unit: m
+    description: RMS distance from the hover setpoint.
+    mean: 0.36
+    stdev: 0.08
+    min: 0
+    correlation: 0.5
+  battery_used:
+    direction: lower_is_better
+    unit: Wh
+    description: Energy drawn during the 60 s hover.
+    mean: 4.1
+    stdev: 0.3
+    min: 0
+    correlation: 0.5

@@ -1,0 +1,19 @@
+# The candidate dropped energy_per_meter from its telemetry, so it cannot be gated.
+# Synthetic run spec (physim-gate synthetic adapter). Not real simulator data.
+run_id: stairs-locomotion-3.3.0-pr-617
+domain: robotics
+simulator: {name: physim-gate-synthetic, version: "1"}
+scenario: {id: quadruped_stair_climb, version: "15cm-steps"}
+policy: {id: locomotion-policy, version: 3.3.0}
+source: {repository: "https://example.com/acme/legged-control.git", commit: 0123456789abcdef0123456789abcdef01234567, branch: new-telemetry, dirty: false}
+created_at: "2026-10-04T05:20:00Z"
+seed: 617
+trials: 50
+first_trial_seed: 700
+metrics:
+  reached_top:
+    distribution: bernoulli
+    direction: higher_is_better
+    description: Robot reached the top landing without falling.
+    p: 0.94
+    correlation: 0.8

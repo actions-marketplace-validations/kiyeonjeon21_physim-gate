@@ -1,0 +1,9 @@
+# Gate for the stair-climbing scenario. The candidate no longer reports energy_per_meter.
+version: 1
+defaults:
+  min_samples: 30
+metrics:
+  reached_top:
+    max_absolute_degradation: 0.05
+  energy_per_meter:
+    max_relative_degradation: 0.08

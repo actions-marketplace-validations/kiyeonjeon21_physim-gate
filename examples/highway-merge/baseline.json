@@ -1,0 +1,1344 @@
+{
+  "schema_version": "1.0",
+  "run_id": "highway-merge-planner-2.0.3-main-1187",
+  "created_at": "2026-10-02T03:00:00Z",
+  "domain": "autonomous_driving",
+  "simulator": {
+    "name": "physim-gate-synthetic",
+    "version": "1"
+  },
+  "scenario": {
+    "id": "highway_on_ramp_merge",
+    "version": "v7"
+  },
+  "policy": {
+    "id": "motion-planner",
+    "version": "2.0.3"
+  },
+  "seeds": [
+    5000,
+    5001,
+    5002,
+    5003,
+    5004,
+    5005,
+    5006,
+    5007,
+    5008,
+    5009,
+    5010,
+    5011,
+    5012,
+    5013,
+    5014,
+    5015,
+    5016,
+    5017,
+    5018,
+    5019,
+    5020,
+    5021,
+    5022,
+    5023,
+    5024,
+    5025,
+    5026,
+    5027,
+    5028,
+    5029,
+    5030,
+    5031,
+    5032,
+    5033,
+    5034,
+    5035,
+    5036,
+    5037,
+    5038,
+    5039,
+    5040,
+    5041,
+    5042,
+    5043,
+    5044,
+    5045,
+    5046,
+    5047,
+    5048,
+    5049,
+    5050,
+    5051,
+    5052,
+    5053,
+    5054,
+    5055,
+    5056,
+    5057,
+    5058,
+    5059,
+    5060,
+    5061,
+    5062,
+    5063,
+    5064,
+    5065,
+    5066,
+    5067,
+    5068,
+    5069,
+    5070,
+    5071,
+    5072,
+    5073,
+    5074,
+    5075,
+    5076,
+    5077,
+    5078,
+    5079
+  ],
+  "source": {
+    "repository": "https://example.com/acme/av-planning.git",
+    "commit": "1f2e3d4c5b6a79881726354453627180a9b8c7d6",
+    "branch": "main",
+    "dirty": false
+  },
+  "environment": {
+    "python": null,
+    "platform": null,
+    "machine": null,
+    "extra": {
+      "generator": "physim-gate-synthetic",
+      "generator_seed": 1187
+    }
+  },
+  "status": "completed",
+  "failure": null,
+  "metrics": {
+    "collision": {
+      "direction": "lower_is_better",
+      "unit": "",
+      "description": "1 if any contact with another agent occurred."
+    },
+    "min_time_to_collision": {
+      "direction": "higher_is_better",
+      "unit": "s",
+      "description": "Smallest time-to-collision to the lead or merging vehicle."
+    },
+    "lateral_error_rms": {
+      "direction": "lower_is_better",
+      "unit": "m",
+      "description": "RMS lateral deviation from the reference path."
+    },
+    "jerk_p95": {
+      "direction": "lower_is_better",
+      "unit": "m/s^3",
+      "description": "95th percentile longitudinal jerk (comfort)."
+    }
+  },
+  "trials": [
+    {
+      "trial_id": "seed-5000",
+      "seed": 5000,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 1.956332,
+        "lateral_error_rms": 0.208899,
+        "jerk_p95": 2.379254
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5001",
+      "seed": 5001,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.837899,
+        "lateral_error_rms": 0.210017,
+        "jerk_p95": 2.485788
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5002",
+      "seed": 5002,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.211251,
+        "lateral_error_rms": 0.134875,
+        "jerk_p95": 2.659362
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5003",
+      "seed": 5003,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 2.783828,
+        "lateral_error_rms": 0.143683,
+        "jerk_p95": 2.257217
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5004",
+      "seed": 5004,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.448881,
+        "lateral_error_rms": 0.199946,
+        "jerk_p95": 2.101598
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5005",
+      "seed": 5005,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.532161,
+        "lateral_error_rms": 0.201257,
+        "jerk_p95": 2.693651
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5006",
+      "seed": 5006,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.220819,
+        "lateral_error_rms": 0.197502,
+        "jerk_p95": 2.296418
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5007",
+      "seed": 5007,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.396141,
+        "lateral_error_rms": 0.185446,
+        "jerk_p95": 2.549053
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5008",
+      "seed": 5008,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.55688,
+        "lateral_error_rms": 0.312788,
+        "jerk_p95": 2.414255
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5009",
+      "seed": 5009,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.411938,
+        "lateral_error_rms": 0.255909,
+        "jerk_p95": 2.517139
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5010",
+      "seed": 5010,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 2.713859,
+        "lateral_error_rms": 0.303295,
+        "jerk_p95": 2.10154
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5011",
+      "seed": 5011,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.294046,
+        "lateral_error_rms": 0.210993,
+        "jerk_p95": 1.875562
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5012",
+      "seed": 5012,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.338216,
+        "lateral_error_rms": 0.285202,
+        "jerk_p95": 2.895248
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5013",
+      "seed": 5013,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.232758,
+        "lateral_error_rms": 0.217911,
+        "jerk_p95": 2.400265
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5014",
+      "seed": 5014,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.505011,
+        "lateral_error_rms": 0.157685,
+        "jerk_p95": 2.080003
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5015",
+      "seed": 5015,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.725154,
+        "lateral_error_rms": 0.159081,
+        "jerk_p95": 1.593481
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5016",
+      "seed": 5016,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 2.598268,
+        "lateral_error_rms": 0.22163,
+        "jerk_p95": 2.315051
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5017",
+      "seed": 5017,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.934207,
+        "lateral_error_rms": 0.193514,
+        "jerk_p95": 2.822791
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5018",
+      "seed": 5018,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 2.565638,
+        "lateral_error_rms": 0.264429,
+        "jerk_p95": 2.080765
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5019",
+      "seed": 5019,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.663533,
+        "lateral_error_rms": 0.247641,
+        "jerk_p95": 3.290191
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5020",
+      "seed": 5020,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 2.990383,
+        "lateral_error_rms": 0.072452,
+        "jerk_p95": 2.690469
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5021",
+      "seed": 5021,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.205891,
+        "lateral_error_rms": 0.207201,
+        "jerk_p95": 2.112013
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5022",
+      "seed": 5022,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 2.610974,
+        "lateral_error_rms": 0.174964,
+        "jerk_p95": 2.225705
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5023",
+      "seed": 5023,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 2.514728,
+        "lateral_error_rms": 0.146,
+        "jerk_p95": 2.210153
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5024",
+      "seed": 5024,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.281426,
+        "lateral_error_rms": 0.16385,
+        "jerk_p95": 2.668759
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5025",
+      "seed": 5025,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.335879,
+        "lateral_error_rms": 0.11709,
+        "jerk_p95": 1.710552
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5026",
+      "seed": 5026,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 2.74027,
+        "lateral_error_rms": 0.211451,
+        "jerk_p95": 2.674182
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5027",
+      "seed": 5027,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.148878,
+        "lateral_error_rms": 0.230177,
+        "jerk_p95": 2.398077
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5028",
+      "seed": 5028,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 2.591485,
+        "lateral_error_rms": 0.23607,
+        "jerk_p95": 2.040846
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5029",
+      "seed": 5029,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.387153,
+        "lateral_error_rms": 0.183452,
+        "jerk_p95": 1.911244
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5030",
+      "seed": 5030,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 1.0,
+        "min_time_to_collision": 3.187962,
+        "lateral_error_rms": 0.239135,
+        "jerk_p95": 2.465174
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5031",
+      "seed": 5031,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 2.936043,
+        "lateral_error_rms": 0.239907,
+        "jerk_p95": 2.017019
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5032",
+      "seed": 5032,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 2.711083,
+        "lateral_error_rms": 0.223957,
+        "jerk_p95": 2.768415
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5033",
+      "seed": 5033,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.44081,
+        "lateral_error_rms": 0.253386,
+        "jerk_p95": 2.4242
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5034",
+      "seed": 5034,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.167322,
+        "lateral_error_rms": 0.293741,
+        "jerk_p95": 3.296107
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5035",
+      "seed": 5035,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 2.946141,
+        "lateral_error_rms": 0.166389,
+        "jerk_p95": 2.612515
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5036",
+      "seed": 5036,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 2.249468,
+        "lateral_error_rms": 0.183985,
+        "jerk_p95": 2.39595
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5037",
+      "seed": 5037,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.530211,
+        "lateral_error_rms": 0.164773,
+        "jerk_p95": 2.093348
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5038",
+      "seed": 5038,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 1.0,
+        "min_time_to_collision": 3.748226,
+        "lateral_error_rms": 0.136535,
+        "jerk_p95": 2.419626
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5039",
+      "seed": 5039,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 2.814556,
+        "lateral_error_rms": 0.226333,
+        "jerk_p95": 2.283759
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5040",
+      "seed": 5040,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.816415,
+        "lateral_error_rms": 0.233595,
+        "jerk_p95": 2.098346
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5041",
+      "seed": 5041,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 2.749627,
+        "lateral_error_rms": 0.165433,
+        "jerk_p95": 2.008293
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5042",
+      "seed": 5042,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.329992,
+        "lateral_error_rms": 0.250089,
+        "jerk_p95": 3.149348
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5043",
+      "seed": 5043,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.108975,
+        "lateral_error_rms": 0.204344,
+        "jerk_p95": 1.97353
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5044",
+      "seed": 5044,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 2.941859,
+        "lateral_error_rms": 0.181785,
+        "jerk_p95": 2.720226
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5045",
+      "seed": 5045,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 2.954164,
+        "lateral_error_rms": 0.270075,
+        "jerk_p95": 2.432929
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5046",
+      "seed": 5046,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 2.798789,
+        "lateral_error_rms": 0.240822,
+        "jerk_p95": 2.374241
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5047",
+      "seed": 5047,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.059408,
+        "lateral_error_rms": 0.235275,
+        "jerk_p95": 1.721002
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5048",
+      "seed": 5048,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.52027,
+        "lateral_error_rms": 0.277415,
+        "jerk_p95": 2.265468
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5049",
+      "seed": 5049,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.99578,
+        "lateral_error_rms": 0.216841,
+        "jerk_p95": 2.21681
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5050",
+      "seed": 5050,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.1042,
+        "lateral_error_rms": 0.274027,
+        "jerk_p95": 2.028899
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5051",
+      "seed": 5051,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.549997,
+        "lateral_error_rms": 0.22064,
+        "jerk_p95": 2.051939
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5052",
+      "seed": 5052,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.414469,
+        "lateral_error_rms": 0.239511,
+        "jerk_p95": 2.024797
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5053",
+      "seed": 5053,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 2.880842,
+        "lateral_error_rms": 0.231813,
+        "jerk_p95": 2.316837
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5054",
+      "seed": 5054,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.057323,
+        "lateral_error_rms": 0.208856,
+        "jerk_p95": 2.168083
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5055",
+      "seed": 5055,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 2.867397,
+        "lateral_error_rms": 0.293328,
+        "jerk_p95": 2.619582
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5056",
+      "seed": 5056,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 2.761041,
+        "lateral_error_rms": 0.206109,
+        "jerk_p95": 2.510063
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5057",
+      "seed": 5057,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 4.219184,
+        "lateral_error_rms": 0.301959,
+        "jerk_p95": 2.698338
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5058",
+      "seed": 5058,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 2.724048,
+        "lateral_error_rms": 0.186488,
+        "jerk_p95": 2.455974
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5059",
+      "seed": 5059,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.099903,
+        "lateral_error_rms": 0.235675,
+        "jerk_p95": 1.791492
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5060",
+      "seed": 5060,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.477198,
+        "lateral_error_rms": 0.23002,
+        "jerk_p95": 2.396867
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5061",
+      "seed": 5061,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 2.831826,
+        "lateral_error_rms": 0.184187,
+        "jerk_p95": 2.074749
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5062",
+      "seed": 5062,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.334568,
+        "lateral_error_rms": 0.287134,
+        "jerk_p95": 2.20164
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5063",
+      "seed": 5063,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.723727,
+        "lateral_error_rms": 0.242104,
+        "jerk_p95": 2.205855
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5064",
+      "seed": 5064,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.346872,
+        "lateral_error_rms": 0.21761,
+        "jerk_p95": 2.120301
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5065",
+      "seed": 5065,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 2.829236,
+        "lateral_error_rms": 0.189644,
+        "jerk_p95": 2.811754
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5066",
+      "seed": 5066,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 2.331245,
+        "lateral_error_rms": 0.201723,
+        "jerk_p95": 2.064126
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5067",
+      "seed": 5067,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.460163,
+        "lateral_error_rms": 0.185088,
+        "jerk_p95": 3.004613
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5068",
+      "seed": 5068,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.391008,
+        "lateral_error_rms": 0.211246,
+        "jerk_p95": 2.632858
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5069",
+      "seed": 5069,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 2.792105,
+        "lateral_error_rms": 0.219385,
+        "jerk_p95": 1.803935
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5070",
+      "seed": 5070,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.078994,
+        "lateral_error_rms": 0.214747,
+        "jerk_p95": 2.713288
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5071",
+      "seed": 5071,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 1.0,
+        "min_time_to_collision": 2.059121,
+        "lateral_error_rms": 0.207532,
+        "jerk_p95": 2.626516
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5072",
+      "seed": 5072,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.281786,
+        "lateral_error_rms": 0.216964,
+        "jerk_p95": 2.303841
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5073",
+      "seed": 5073,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.542578,
+        "lateral_error_rms": 0.21583,
+        "jerk_p95": 2.844027
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5074",
+      "seed": 5074,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.115876,
+        "lateral_error_rms": 0.227766,
+        "jerk_p95": 2.423353
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5075",
+      "seed": 5075,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 2.752139,
+        "lateral_error_rms": 0.196016,
+        "jerk_p95": 2.563113
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5076",
+      "seed": 5076,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.910124,
+        "lateral_error_rms": 0.224447,
+        "jerk_p95": 2.680797
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5077",
+      "seed": 5077,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.296083,
+        "lateral_error_rms": 0.255276,
+        "jerk_p95": 2.087001
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5078",
+      "seed": 5078,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 2.981032,
+        "lateral_error_rms": 0.089998,
+        "jerk_p95": 2.578741
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    },
+    {
+      "trial_id": "seed-5079",
+      "seed": 5079,
+      "status": "ok",
+      "failure": null,
+      "metrics": {
+        "collision": 0.0,
+        "min_time_to_collision": 3.855991,
+        "lateral_error_rms": 0.247035,
+        "jerk_p95": 1.753187
+      },
+      "duration_s": null,
+      "artifacts": [],
+      "labels": {}
+    }
+  ],
+  "artifacts": [],
+  "labels": {},
+  "extra": {}
+}
