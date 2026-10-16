@@ -19,6 +19,7 @@ from physim_gate.schema import (
     Domain,
     Environment,
     Identifier,
+    InputError,
     RunStatus,
     SchemaError,
     Simulator,
@@ -192,7 +193,7 @@ def load_comparison(path: Path) -> ComparisonResult:
     try:
         text = path.read_text(encoding="utf-8")
     except OSError as exc:
-        raise SchemaError(f"{path}: cannot read file ({exc.strerror or exc})") from exc
+        raise InputError(f"{path}: cannot read file ({exc.strerror or exc})") from exc
     return comparison_from_data(parse_json_text(text, str(path)), str(path))
 
 

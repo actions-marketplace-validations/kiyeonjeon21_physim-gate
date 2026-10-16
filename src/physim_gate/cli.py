@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import traceback
 from collections.abc import Callable, Iterator
@@ -27,13 +28,14 @@ from physim_gate.comparison import (
 )
 from physim_gate.config import GateConfig, load_config
 from physim_gate.engine import compare_runs
-from physim_gate.provenance import sha256_file
+from physim_gate.provenance import sha256_path
 from physim_gate.reporting.html import render_html
 from physim_gate.reporting.junit import render_junit
 from physim_gate.reporting.terminal import VERDICT_STYLE, make_console, print_comparison
 from physim_gate.schema import (
     FAILURE_RATE_METRIC,
     Direction,
+    InputError,
     RunResult,
     SchemaError,
     dump_json,
@@ -167,9 +169,9 @@ def compare(
         base_run = _load(adapter, baseline, options)
         cand_run = _load(adapter, candidate, options)
         inputs = Inputs(
-            baseline=InputRef(path=str(baseline), sha256=sha256_file(baseline)),
-            candidate=InputRef(path=str(candidate), sha256=sha256_file(candidate)),
-            config=InputRef(path=str(config), sha256=sha256_file(config)),
+            baseline=InputRef(path=str(baseline), sha256=sha256_path(baseline)),
+            candidate=InputRef(path=str(candidate), sha256=sha256_path(candidate)),
+            config=InputRef(path=str(config), sha256=sha256_path(config)),
             adapter=adapter,
         )
         result = compare_runs(base_run, cand_run, gate, inputs=inputs)
@@ -199,13 +201,30 @@ def _emit(
         _write(junit, render_junit(result))
     if html is not None:
         _write(html, render_html(result))
-    if output_format is OutputFormat.JSON:
-        typer.echo(dump_json(result), nl=False)
-        return
-    print_comparison(result, out, verbose=verbose)
-    written = [str(p) for p in (output, junit, html) if p is not None]
-    if written:
-        out.print(Text(f"wrote {', '.join(written)}", style="dim"))
+    with _tolerate_closed_stdout():
+        if output_format is OutputFormat.JSON:
+            typer.echo(dump_json(result), nl=False)
+            return
+        print_comparison(result, out, verbose=verbose)
+        written = [str(p) for p in (output, junit, html) if p is not None]
+        if written:
+            out.print(Text(f"wrote {', '.join(written)}", style="dim"))
+
+
+@contextmanager
+def _tolerate_closed_stdout() -> Iterator[None]:
+    """Keep the verdict's exit code when stdout is closed early (``... | head``).
+
+    Without this, the BrokenPipeError would turn any verdict into exit code 1, which means
+    "regression". Further writes go to /dev/null so the interpreter's final flush stays quiet.
+    """
+    try:
+        yield
+        sys.stdout.flush()
+    except BrokenPipeError:
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(devnull, sys.stdout.fileno())
+        os.close(devnull)
 
 
 @app.command(epilog=EXIT_CODES_HELP)
@@ -252,6 +271,8 @@ def validate(
             _fail(f"{results}: no such file")
         try:
             run = get_adapter(adapter).load(results, options)
+        except InputError:
+            raise
         except SchemaError as exc:
             errors = [exc.message, *exc.problems]
         if run is not None:
@@ -346,13 +367,15 @@ def init(
         typer.Option("--from", help="Derive the metric list from an existing run result."),
     ] = None,
     adapter: AdapterOpt = "json",
+    adapter_option: AdapterOptionsOpt = None,
     force: Annotated[bool, typer.Option("--force", help="Overwrite an existing file.")] = False,
 ) -> None:
     """Write a starter gate.yaml. Review every margin before relying on it."""
     with _guard():
         if path.exists() and not force:
             _fail(f"{path} already exists (use --force to overwrite)")
-        run = _load(adapter, from_results, {}) if from_results is not None else None
+        options = parse_options(adapter_option or [])
+        run = _load(adapter, from_results, options) if from_results is not None else None
         document = _init_document(run)
         body = yaml.safe_dump(document, sort_keys=False, default_flow_style=False)
         note = (

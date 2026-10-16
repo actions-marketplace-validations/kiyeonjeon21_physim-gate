@@ -31,6 +31,7 @@ from physim_gate.schema import (
     Environment,
     Failure,
     Identifier,
+    InputError,
     MetricSpec,
     RunResult,
     SchemaError,
@@ -175,7 +176,7 @@ def load_spec(path: Path) -> SyntheticSpec:
     try:
         data = yaml.safe_load(path.read_text(encoding="utf-8"))
     except OSError as exc:
-        raise SchemaError(f"{path}: cannot read file ({exc.strerror or exc})") from exc
+        raise InputError(f"{path}: cannot read file ({exc.strerror or exc})") from exc
     except yaml.YAMLError as exc:
         raise SchemaError(f"{path}: invalid YAML: {exc}") from exc
     try:

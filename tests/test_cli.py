@@ -257,3 +257,84 @@ def test_console_script_end_to_end(tmp_path: Path) -> None:
         check=False,
     )
     assert module.stdout.strip() == f"physim-gate {__version__}"
+
+
+def test_validate_unreadable_input_exits_2(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["validate", str(tmp_path)])
+    assert result.exit_code == 2
+    assert "cannot read file" in result.output
+
+
+def test_directory_inputs_are_hashed_not_crashed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Adapters may read a directory per run; provenance must hash it instead of crashing."""
+    b, c, g = materialize(tmp_path, "regression")
+    for name, source in (("base_dir", b), ("cand_dir", c)):
+        (tmp_path / name).mkdir()
+        (tmp_path / name / "run.json").write_text(source.read_text())
+
+    class DirAdapter:
+        name = "dir"
+        description = "reads run.json from a directory"
+
+        def load(self, source: Path, options: object) -> object:
+            from physim_gate.schema import load_run
+
+            return load_run(source / "run.json")
+
+    monkeypatch.setattr("physim_gate.cli.get_adapter", lambda _name: DirAdapter())
+    out = tmp_path / "comparison.json"
+    args = [
+        "compare",
+        "-b",
+        str(tmp_path / "base_dir"),
+        "-c",
+        str(tmp_path / "cand_dir"),
+        "-g",
+        str(g),
+    ]
+    result = runner.invoke(app, [*args, "--adapter", "dir", "-o", str(out)])
+    assert result.exit_code == 1, result.output
+    digest = json.loads(out.read_text())["inputs"]["baseline"]["sha256"]
+    assert len(digest) == 64
+    (tmp_path / "base_dir" / "extra.txt").write_text("changed")
+    runner.invoke(app, [*args, "--adapter", "dir", "-o", str(out)])
+    assert json.loads(out.read_text())["inputs"]["baseline"]["sha256"] != digest
+
+
+def test_init_passes_adapter_options(tmp_path: Path) -> None:
+    with fixture_dir("regression") as source:
+        spec = source / "baseline.yaml"
+        target = tmp_path / "gate.yaml"
+        result = runner.invoke(
+            app,
+            ["init", str(target), "--adapter", "synthetic", "--from", str(spec), "-O", "trials=5"],
+        )
+    assert result.exit_code == 0, result.output
+    assert "collision:" in target.read_text()
+    bad = runner.invoke(
+        app, ["init", str(tmp_path / "x.yaml"), "--from", str(spec), "-O", "nope=1"]
+    )
+    assert bad.exit_code == 2
+
+
+@pytest.mark.parametrize(("scenario", "code"), [("regression", 1), ("insufficient_evidence", 3)])
+def test_exit_code_survives_a_closed_stdout(tmp_path: Path, scenario: str, code: int) -> None:
+    """`physim-gate compare ... | head -1` must keep the verdict's exit code."""
+    paths = materialize(tmp_path, scenario)
+    script = Path(sys.executable).parent / "physim-gate"
+    command = [str(script)] if script.exists() else [sys.executable, "-m", "physim_gate"]
+    process = subprocess.Popen(
+        [*command, *compare_args(paths)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env={**os.environ, "NO_COLOR": "1", "COLUMNS": "120"},
+    )
+    assert process.stdout is not None
+    assert process.stderr is not None
+    process.stdout.readline()
+    process.stdout.close()
+    stderr = process.stderr.read().decode()
+    assert process.wait() == code, stderr
+    process.stderr.close()

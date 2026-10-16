@@ -24,6 +24,19 @@ VERDICT_STYLE = {
 _TABLE_MIN_WIDTH = 100
 
 
+class _Console(Console):
+    def on_broken_pipe(self) -> None:
+        """Stop writing when the reader went away (``... | head``) without exiting.
+
+        Rich's default raises ``SystemExit(1)``, which would replace the verdict's exit code
+        with 1 ("regression"). The process must keep the exit code of the actual result.
+        """
+        self.quiet = True
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(devnull, (sys.stderr if self.stderr else sys.stdout).fileno())
+        os.close(devnull)
+
+
 def make_console(*, stderr: bool = False) -> Console:
     """A console that does not squeeze tables into 80 columns in CI logs.
 
@@ -33,7 +46,7 @@ def make_console(*, stderr: bool = False) -> Console:
     stream = sys.stderr if stderr else sys.stdout
     interactive = stream.isatty()
     width = None if interactive or "COLUMNS" in os.environ else 120
-    return Console(stderr=stderr, highlight=False, width=width, soft_wrap=stderr)
+    return _Console(stderr=stderr, highlight=False, width=width, soft_wrap=stderr)
 
 
 def _run_line(label: str, run: RunSummary) -> Text:
@@ -162,7 +175,7 @@ def print_comparison(
         console.print(_table(result))
         console.print(
             Text(
-                "degradation > 0 means worse; interval = bootstrap interval of the degradation; "
+                "degradation > 0 means worse; interval = confidence interval of the degradation; "
                 "n = matched pairs or baseline/candidate observations",
                 style="dim",
             )

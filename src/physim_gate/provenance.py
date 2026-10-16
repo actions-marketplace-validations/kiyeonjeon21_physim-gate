@@ -28,6 +28,21 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def sha256_path(path: Path) -> str:
+    """Content hash of a file, or of a directory tree (relative paths and file contents).
+
+    Adapters may read a directory per run. Its hash covers every regular file under it, in
+    sorted order, so renaming or editing any file changes the hash.
+    """
+    if not path.is_dir():
+        return sha256_file(path)
+    digest = hashlib.sha256()
+    for child in sorted(p for p in path.rglob("*") if p.is_file()):
+        digest.update(child.relative_to(path).as_posix().encode("utf-8") + b"\0")
+        digest.update(sha256_file(child).encode("ascii") + b"\n")
+    return digest.hexdigest()
+
+
 def capture_environment(**extra: str | int | float | bool | None) -> Environment:
     """Describe the current interpreter and platform. No hostnames or user names are recorded."""
     return Environment(

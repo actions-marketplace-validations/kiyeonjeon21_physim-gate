@@ -13,7 +13,7 @@ from typing import Annotated, Any, Literal, Self
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
-from physim_gate.schema import Direction, SchemaError, format_validation_error
+from physim_gate.schema import Direction, InputError, SchemaError, format_validation_error
 
 CONFIG_VERSION = 1
 
@@ -150,7 +150,7 @@ def load_config(path: Path) -> GateConfig:
     try:
         text = path.read_text(encoding="utf-8")
     except OSError as exc:
-        raise SchemaError(f"{path}: cannot read file ({exc.strerror or exc})") from exc
+        raise InputError(f"{path}: cannot read file ({exc.strerror or exc})") from exc
     try:
         data = yaml.safe_load(text)
     except yaml.YAMLError as exc:

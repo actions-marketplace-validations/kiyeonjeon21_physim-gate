@@ -35,6 +35,7 @@ from physim_gate.schema import (
     Domain,
     Failure,
     Identifier,
+    InputError,
     MetricSpec,
     RunResult,
     RunStatus,
@@ -199,7 +200,7 @@ class GymnasiumAdapter:
         try:
             data = yaml.safe_load(source.read_text(encoding="utf-8"))
         except OSError as exc:
-            raise SchemaError(f"{source}: cannot read file ({exc.strerror or exc})") from exc
+            raise InputError(f"{source}: cannot read file ({exc.strerror or exc})") from exc
         except yaml.YAMLError as exc:
             raise SchemaError(f"{source}: invalid YAML: {exc}") from exc
         if not isinstance(data, dict):

@@ -8,6 +8,7 @@ import pytest
 
 from physim_gate.schema import (
     FAILURE_RATE_METRIC,
+    InputError,
     RunResult,
     SchemaError,
     dump_json,
@@ -160,3 +161,16 @@ def test_published_json_schema_is_current() -> None:
     schemas = Path(__file__).parent.parent / "schemas"
     published = json.loads((schemas / "run-result.schema.json").read_text())
     assert published == RunResult.model_json_schema()
+
+
+def test_integers_too_large_for_a_float_are_rejected(tmp_path: Path) -> None:
+    text = json.dumps(minimal()).replace('"success": 1}', '"success": ' + "9" * 400 + "}")
+    path = tmp_path / "run.json"
+    path.write_text(text)
+    with pytest.raises(SchemaError, match="too large"):
+        load_run(path)
+
+
+def test_unreadable_input_is_an_input_error(tmp_path: Path) -> None:
+    with pytest.raises(InputError, match="cannot read file"):
+        load_run(tmp_path)

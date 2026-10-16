@@ -11,6 +11,7 @@ purposes, while ``0.0`` is always a valid observation. Non-finite numbers are re
 from __future__ import annotations
 
 import json
+import math
 import re
 from datetime import datetime
 from enum import StrEnum
@@ -18,6 +19,7 @@ from pathlib import Path
 from typing import Annotated, Any, Self
 
 from pydantic import (
+    AfterValidator,
     BaseModel,
     ConfigDict,
     Field,
@@ -40,7 +42,20 @@ FAILURE_RATE_METRIC = "physim.failure_rate"
 _METRIC_NAME = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.:/\-]*$")
 _SCHEMA_VERSION = re.compile(r"^(\d+)\.(\d+)$")
 
-MetricValue = Annotated[StrictFloat | StrictInt, Field(allow_inf_nan=False)]
+
+def _finite_float(value: float | int) -> float:
+    try:
+        number = float(value)
+    except OverflowError:
+        raise ValueError("number is too large to represent as a float") from None
+    if not math.isfinite(number):
+        raise ValueError("number must be finite")
+    return number
+
+
+# Converted (and range-checked) by ``_finite_float``; pydantic's own non-finite check would
+# overflow on integers too large for a float before reporting a validation error.
+MetricValue = Annotated[StrictFloat | StrictInt, AfterValidator(_finite_float)]
 NonEmptyStr = Annotated[str, Field(min_length=1)]
 
 
@@ -59,6 +74,10 @@ class SchemaError(ValueError):
         if not self.problems:
             return self.message
         return self.message + "\n" + "\n".join(f"  - {p}" for p in self.problems)
+
+
+class InputError(SchemaError):
+    """The input could not be read at all (missing, a directory, no permission)."""
 
 
 class _Model(BaseModel):
@@ -287,7 +306,7 @@ def load_run(path: Path) -> RunResult:
     try:
         text = path.read_text(encoding="utf-8")
     except OSError as exc:
-        raise SchemaError(f"{path}: cannot read file ({exc.strerror or exc})") from exc
+        raise InputError(f"{path}: cannot read file ({exc.strerror or exc})") from exc
     return run_from_data(parse_json_text(text, str(path)), str(path))
 
 
