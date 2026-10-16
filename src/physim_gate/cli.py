@@ -874,7 +874,7 @@ def _print_suite(result: SuiteResult, *, verbose: bool) -> None:
             out.print()
         elif outcome.error is not None:
             out.rule(Text(outcome.name, style="bold"), align="left")
-            out.print(Text("error: ", style="bold red") + Text(outcome.error))
+            out.print(Text("error: ", style="bold red") + Text(outcome.error), soft_wrap=True)
             out.print()
     out.rule(Text("suite", style="bold"), align="left")
     table = Table(show_edge=False, pad_edge=False, header_style="bold")

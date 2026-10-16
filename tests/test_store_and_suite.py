@@ -193,7 +193,8 @@ def test_suite_errors_do_not_stop_other_scenarios(tmp_path: Path) -> None:
     )
     result = runner.invoke(app, ["suite", str(suite), "-o", str(tmp_path / "out")])
     assert result.exit_code == 2, result.output
-    assert "missing-dir: no such file" in result.output
+    # The whole path stays on one line, however long (macOS temporary directories are long).
+    assert f"error: {tmp_path / 'missing-dir'}: no such file\n" in result.output
     junit = ET.fromstring((tmp_path / "out" / "junit.xml").read_text())
     assert junit.get("errors") is not None
     assert int(junit.get("errors", "0")) >= 2
