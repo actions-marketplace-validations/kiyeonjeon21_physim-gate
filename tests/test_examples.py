@@ -31,3 +31,29 @@ def test_example_files_are_valid() -> None:
         EXAMPLES / "gymnasium" / "gate.yaml",
     ):
         load_config(path)
+
+
+def test_lerobot_pusht_example_verdicts() -> None:
+    """The real LeRobot output gives the verdicts its README describes."""
+    from physim_gate.adapters.base import get_adapter
+    from physim_gate.engine import compare_runs
+
+    folder = EXAMPLES / "lerobot-pusht"
+    adapter = get_adapter("lerobot")
+    gate = load_config(folder / "gate.yaml")
+    baseline = adapter.load(folder / "baseline", {"start_seed": "1000"})
+
+    rerun = adapter.load(folder / "baseline-rerun", {"start_seed": "1000"})
+    same = compare_runs(baseline, rerun, gate)
+    assert same.verdict.value == "PASS"
+    assert same.exit_code == 0
+
+    candidate = adapter.load(folder / "candidate-n-action-steps-8", {"start_seed": "1000"})
+    changed = compare_runs(baseline, candidate, gate)
+    verdicts = {m.name: m.verdict.value for m in changed.metrics}
+    assert verdicts == {"success": "INCONCLUSIVE", "max_reward": "FAIL", "sum_reward": "PASS"}
+    assert changed.exit_code == 1
+    success = next(m for m in changed.metrics if m.name == "success")
+    assert success.evidence.degradation_ci is not None
+    low, high = success.evidence.degradation_ci
+    assert (round(low, 3), round(high, 3)) == (0.034, 0.177)

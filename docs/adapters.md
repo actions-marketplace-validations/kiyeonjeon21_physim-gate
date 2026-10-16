@@ -44,7 +44,7 @@ physim-gate compare --adapter mysim -O split=val -b base_dir/ -c cand_dir/ -g ga
 
 Discovery rules:
 
-- Built-in adapters (`json`, `synthetic`, `gymnasium`) are always available.
+- Built-in adapters (`json`, `synthetic`, `gymnasium`, `lerobot`) are always available.
 - A third-party adapter whose name collides with a different registration is listed as a conflict and ignored.
 - An adapter that fails to import or does not satisfy the protocol is reported when selected, with the underlying error. Other adapters keep working.
 
@@ -64,9 +64,37 @@ Discovery rules:
 | `json` | A PhySim Gate run-result JSON file | The default |
 | `synthetic` | A YAML spec | Deterministic synthetic data for demos and tests. Options: `seed`, `trials` |
 | `gymnasium` | A YAML spec with `env_id`, `policy`, `run_id`, `episodes`, ... | Requires the `gymnasium` extra. Rolls out `policy` (a `module:function` mapping observations to actions, or `random`) once per seed. Tested with CartPole on CPU |
+| `lerobot` | LeRobot's `eval_info.json`, or the `lerobot-eval` output directory that contains it | No extra dependency. See below |
 
 Security note: adapters are ordinary Python code, and the `gymnasium` adapter imports and calls the policy function named in its spec.
 Treat adapter specs and installed plugins like any other code you run.
+
+## LeRobot
+
+`lerobot-eval` writes `eval_info.json` to its `--output_dir`.
+The adapter reads both layouts that LeRobot's own CI parser (`scripts/ci/parse_eval_metrics.py` in the LeRobot repository) recognizes:
+
+- **Multi-task**, written by LeRobot 0.4.0 and later: `per_task` entries with `task_group`, `task_id` and per-episode lists `sum_rewards`, `max_rewards` and `successes`.
+- **Single-task**, written by LeRobot 0.3.x and earlier: `per_episode` records with `episode_ix`, `sum_reward`, `max_reward`, `success` and `seed`.
+
+Each episode becomes one trial with the metrics `success` (0 or 1), `sum_reward` and `max_reward`, all higher-is-better.
+The aggregates (`overall`, `per_group`, `aggregated`) are ignored, because the comparison recomputes everything from the episodes.
+That also skips the `NaN` values `json.dump` writes there for empty groups; a `NaN` or `null` in an episode value becomes a missing value.
+
+Trial ids are `<task_group>/<task_id>/<episode index>` (multi-task) or `episode-<episode_ix>` (single-task).
+`lerobot-eval` seeds episode `i` of every task with `--seed + i`, so two evaluations with the same `--seed` and episode count share trial ids and are compared as matched pairs.
+The multi-task layout does not record seeds, so the adapter cannot check that both evaluations used the same one; that is up to you.
+
+| Option | Meaning |
+|---|---|
+| `start_seed` | The `--seed` given to `lerobot-eval`; records each trial's seed as `start_seed + i` |
+| `task_group` | Read only this task group, for example `libero_spatial` |
+| `run_id` | Run id; defaults to the name of the output directory |
+| `policy` | Policy id to record, for example the Hugging Face repository of the checkpoint |
+| `scenario` | Scenario id; defaults to the task groups joined with `+` |
+
+Tested with real output of LeRobot 0.6.2 on PushT ([`examples/lerobot-pusht/`](../examples/lerobot-pusht)).
+The multi-group and single-task layouts are tested with files constructed from LeRobot's source, not with real LIBERO or MetaWorld output.
 
 ## Example: CSV
 
@@ -78,7 +106,6 @@ CI installs it and runs a comparison through it, which tests the plugin path end
 These are not implemented.
 They are listed to show intended scope; see the [roadmap](roadmap.md).
 
-- LeRobot `eval_info.json` (per-episode `sum_reward`, `max_reward`, `success`, `seed`).
 - ROS 2 bag summaries (via user-defined metric extractors).
 - PX4 SITL ULog flight logs.
 - CARLA ScenarioRunner and Leaderboard result JSON.

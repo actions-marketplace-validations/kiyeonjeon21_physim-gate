@@ -28,6 +28,7 @@ BUILTIN_ADAPTERS: dict[str, str] = {
     "json": "physim_gate.adapters.json_adapter:JsonAdapter",
     "synthetic": "physim_gate.adapters.synthetic:SyntheticAdapter",
     "gymnasium": "physim_gate.adapters.gymnasium:GymnasiumAdapter",
+    "lerobot": "physim_gate.adapters.lerobot:LeRobotAdapter",
 }
 
 

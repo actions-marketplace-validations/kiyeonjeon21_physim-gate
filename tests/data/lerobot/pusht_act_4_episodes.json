@@ -1,0 +1,82 @@
+{
+  "per_task": [
+    {
+      "task_group": "pusht",
+      "task_id": 0,
+      "metrics": {
+        "sum_rewards": [
+          111.8190443637449,
+          115.40364960070963,
+          36.571338777710864,
+          160.1567501073311
+        ],
+        "max_rewards": [
+          0.9882781062340056,
+          1.0,
+          0.6518541112637845,
+          0.995344277513085
+        ],
+        "successes": [
+          false,
+          true,
+          false,
+          false
+        ],
+        "video_paths": [
+          "lr-out/probe/videos/pusht_0/eval_episode_0.mp4",
+          "lr-out/probe/videos/pusht_0/eval_episode_1.mp4",
+          "lr-out/probe/videos/pusht_0/eval_episode_2.mp4",
+          "lr-out/probe/videos/pusht_0/eval_episode_3.mp4"
+        ],
+        "predicted_video_paths": []
+      },
+      "n_episodes": 4,
+      "n_success": 1,
+      "pc_success": 25.0,
+      "pc_success_ci95": [
+        4.558726080970055,
+        69.9358157417598
+      ]
+    }
+  ],
+  "per_group": {
+    "pusht": {
+      "avg_sum_reward": 105.98769571237412,
+      "avg_max_reward": 0.9088691237527187,
+      "pc_success": 25.0,
+      "n_episodes": 4,
+      "n_success": 1,
+      "pc_success_ci95": [
+        4.558726080970055,
+        69.9358157417598
+      ],
+      "video_paths": [
+        "lr-out/probe/videos/pusht_0/eval_episode_0.mp4",
+        "lr-out/probe/videos/pusht_0/eval_episode_1.mp4",
+        "lr-out/probe/videos/pusht_0/eval_episode_2.mp4",
+        "lr-out/probe/videos/pusht_0/eval_episode_3.mp4"
+      ],
+      "predicted_video_paths": []
+    }
+  },
+  "overall": {
+    "avg_sum_reward": 105.98769571237412,
+    "avg_max_reward": 0.9088691237527187,
+    "pc_success": 25.0,
+    "n_episodes": 4,
+    "n_success": 1,
+    "pc_success_ci95": [
+      4.558726080970055,
+      69.9358157417598
+    ],
+    "eval_s": 2.2839739322662354,
+    "eval_ep_s": 0.5709934830665588,
+    "video_paths": [
+      "lr-out/probe/videos/pusht_0/eval_episode_0.mp4",
+      "lr-out/probe/videos/pusht_0/eval_episode_1.mp4",
+      "lr-out/probe/videos/pusht_0/eval_episode_2.mp4",
+      "lr-out/probe/videos/pusht_0/eval_episode_3.mp4"
+    ],
+    "predicted_video_paths": []
+  }
+}

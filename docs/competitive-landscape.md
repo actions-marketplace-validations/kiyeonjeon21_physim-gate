@@ -43,11 +43,11 @@ The two could be combined: RoboCI results could be converted into PhySim Gate ru
 [github.com/huggingface/lerobot](https://github.com/huggingface/lerobot)
 
 - Evaluates a policy in simulation (for example LIBERO and MetaWorld, or environments shared on the Hugging Face Hub) or on real hardware.
-- Writes `eval_info.json` with per-episode records (`episode_ix`, `sum_reward`, `max_reward`, `success`, `seed`) and aggregates (`avg_sum_reward`, `pc_success`, `n_episodes`, ...), including a 95% Wilson interval on the success rate (`lerobot/utils/eval_stats.py`).
+- Writes `eval_info.json` with per-episode values and aggregates (`avg_sum_reward`, `pc_success`, `n_episodes`, ...), including a 95% Wilson interval on the success rate (`lerobot/utils/eval_stats.py`). Since 0.4.0 it stores per-task lists (`per_task` with `sum_rewards`, `max_rewards`, `successes`); 0.3.x stored `per_episode` records that also included each episode's `seed` (checked in the `v0.3.3` and `v0.4.0` tags and at commit `146d847`).
 - No baseline-versus-candidate comparison in the evaluation script.
 
 **Overlap:** none in the comparison step.
-**Relationship:** LeRobot is a natural producer of results for PhySim Gate. A LeRobot adapter is the first item on the [roadmap](roadmap.md).
+**Relationship:** LeRobot is a natural producer of results for PhySim Gate, and the built-in `lerobot` adapter reads both `eval_info.json` layouts (see [adapters](adapters.md#lerobot)).
 
 ## Scenic
 
