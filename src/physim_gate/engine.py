@@ -30,7 +30,14 @@ from physim_gate.comparison import (
     Tool,
     Verdict,
 )
-from physim_gate.config import Correction, GateConfig, OnUncertain, Pairing, ResolvedMetricGate
+from physim_gate.config import (
+    Correction,
+    GateConfig,
+    OnUncertain,
+    Pairing,
+    ResolvedMetricGate,
+    Statistic,
+)
 from physim_gate.provenance import utc_now
 from physim_gate.schema import (
     FAILURE_RATE_METRIC,
@@ -39,7 +46,16 @@ from physim_gate.schema import (
     RunStatus,
     TrialStatus,
 )
-from physim_gate.stats import bootstrap_degradation, mean, median, stat_fn, stdev
+from physim_gate.stats import (
+    BootstrapResult,
+    bootstrap_degradation,
+    is_binary,
+    mean,
+    median,
+    newcombe_difference,
+    stat_fn,
+    stdev,
+)
 
 _MAX_LISTED_IDS = 20
 
@@ -225,18 +241,34 @@ def _compare_metric(
             reasons=reasons,
         )
 
-    seed = f"{gate.bootstrap_seed}:{gate.name}"
-    boot = bootstrap_degradation(
-        samples.baseline,
-        samples.candidate,
-        paired=paired,
-        statistic=gate.statistic,
-        sign=sign,
-        margin=margin_fn,
-        confidence=adjusted_confidence,
-        resamples=gate.bootstrap_resamples,
-        seed=seed,
-    )
+    bootstrap_seed = f"{gate.bootstrap_seed}:{gate.name}"
+    seed: str | None = bootstrap_seed
+    resamples: int | None = gate.bootstrap_resamples
+    binary = gate.statistic is Statistic.MEAN and is_binary(samples.baseline + samples.candidate)
+    if binary:
+        # 0/1 metrics: a percentile bootstrap collapses to a zero-width interval when a run has no
+        # events, which would "prove" non-inferiority from 0 of 30 trials. Use a score interval.
+        low, high = newcombe_difference(
+            samples.baseline, samples.candidate, paired=paired, confidence=adjusted_confidence
+        )
+        degradation_ci = (low, high) if sign > 0 else (-high, -low)
+        excess = (degradation_ci[0] - margin, degradation_ci[1] - margin)
+        boot = BootstrapResult(degradation=degradation_ci, excess=excess)
+        method = "paired_newcombe" if paired else "unpaired_newcombe"
+        seed = resamples = None
+    else:
+        boot = bootstrap_degradation(
+            samples.baseline,
+            samples.candidate,
+            paired=paired,
+            statistic=gate.statistic,
+            sign=sign,
+            margin=margin_fn,
+            confidence=adjusted_confidence,
+            resamples=gate.bootstrap_resamples,
+            seed=bootstrap_seed,
+        )
+        method = "paired_bootstrap" if paired else "unpaired_bootstrap"
     excess_low, excess_high = boot.excess
     pct = _pct(adjusted_confidence)
     if excess_low > 0:
@@ -261,10 +293,10 @@ def _compare_metric(
 
     evidence = StatisticalEvidence(
         outcome=outcome,
-        method="paired_bootstrap" if paired else "unpaired_bootstrap",
+        method=method,
         confidence=gate.confidence,
         adjusted_confidence=adjusted_confidence,
-        resamples=gate.bootstrap_resamples,
+        resamples=resamples,
         seed=seed,
         degradation_ci=boot.degradation,
         excess_ci=boot.excess,

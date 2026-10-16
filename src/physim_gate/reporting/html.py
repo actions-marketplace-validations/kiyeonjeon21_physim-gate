@@ -14,6 +14,8 @@ from physim_gate.comparison import ComparisonResult, Evidence, MetricComparison,
 from physim_gate.reporting.format import (
     direction_label,
     interval,
+    interval_kind,
+    method_label,
     num,
     percent,
     signed,
@@ -200,7 +202,7 @@ def _degradation(metric: MetricComparison) -> str:
     zone_left = _pos(n.margin, lo, hi)
     flip = " flip" if (n.margin - lo) / (hi - lo) > 0.7 else ""
     caption_note = (
-        f"{num((conf or 0) * 100, 4)}% bootstrap interval"
+        f"{num((conf or 0) * 100, 4)}% {interval_kind(metric)}"
         if ci is not None
         else "no interval (see reasons)"
     )
@@ -291,10 +293,9 @@ def _metric_card(metric: MetricComparison) -> str:
         meta.insert(0, direction_label(metric))
     if metric.numerical is not None:
         meta.append(f"margin basis: {metric.numerical.margin_basis}")
-    if metric.evidence.method:
-        meta.append(
-            f"{metric.evidence.method.replace('_', ' ')}, {metric.evidence.resamples} resamples"
-        )
+    method = method_label(metric)
+    if method:
+        meta.append(method)
     if not metric.required:
         meta.append("optional (non-blocking)")
     reasons = "".join(f"<li>{_e(r)}</li>" for r in metric.reasons)
@@ -565,7 +566,7 @@ def render_html(result: ComparisonResult) -> str:
 </section>
 
 <footer>
-<p>How to read this: degradation is candidate minus baseline, signed so that positive is worse. A metric FAILs only when the whole bootstrap interval lies beyond the allowed margin, and PASSes only when it lies entirely within it. Otherwise the evidence is inconclusive. Bootstrap intervals are approximate and can be too narrow with few trials. Matching seeds do not guarantee identical physics. See docs/comparison-semantics.md.</p>
+<p>How to read this: degradation is candidate minus baseline, signed so that positive is worse. A metric FAILs only when the whole confidence interval lies beyond the allowed margin, and PASSes only when it lies entirely within it. Otherwise the evidence is inconclusive. Intervals are a bootstrap for continuous metrics and a Newcombe score interval for 0/1 metrics. Both are approximate, and the bootstrap can be too narrow with few trials. Matching seeds do not guarantee identical physics. See docs/comparison-semantics.md.</p>
 <p>Generated {_e(result.generated_at.isoformat())} by physim-gate {_e(result.tool.version)} · comparison schema {_e(result.schema_version)}</p>
 </footer>
 </main>

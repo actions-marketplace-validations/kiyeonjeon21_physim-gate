@@ -3,7 +3,16 @@ from __future__ import annotations
 import pytest
 
 from physim_gate.config import Statistic
-from physim_gate.stats import bootstrap_degradation, mean, median, quantile, stdev
+from physim_gate.stats import (
+    bootstrap_degradation,
+    is_binary,
+    mean,
+    median,
+    newcombe_difference,
+    quantile,
+    stdev,
+    wilson_interval,
+)
 
 
 def test_basic_statistics() -> None:
@@ -68,3 +77,40 @@ def test_input_checks() -> None:
         boot(baseline=[1.0, 2.0], candidate=[1.0], paired=True)
     with pytest.raises(ValueError, match="non-empty"):
         boot(baseline=[], candidate=[1.0])
+
+
+def test_newcombe_unpaired_matches_published_example() -> None:
+    # Newcombe (1998), Stat Med 17:873, example (a): 56/70 vs 48/80, method 10.
+    baseline = [1.0] * 48 + [0.0] * 32
+    candidate = [1.0] * 56 + [0.0] * 14
+    low, high = newcombe_difference(baseline, candidate, paired=False, confidence=0.95)
+    assert (round(low, 4), round(high, 4)) == (0.0524, 0.3339)
+
+
+def test_newcombe_stays_wide_with_zero_events() -> None:
+    zeros = [0.0] * 30
+    low, high = newcombe_difference(zeros, zeros, paired=False, confidence=0.95)
+    # 0 of 30 is compatible with a true rate of about 11%, so the difference is uncertain.
+    assert low < -0.1
+    assert high > 0.1
+    low, high = newcombe_difference(zeros, zeros, paired=True, confidence=0.95)
+    assert high > 0.05
+
+
+def test_newcombe_paired_uses_the_pairing() -> None:
+    baseline = [1.0] * 20 + [0.0] * 20
+    candidate = [1.0] * 18 + [0.0] * 2 + [0.0] * 20  # 2 discordant pairs only
+    paired = newcombe_difference(baseline, candidate, paired=True, confidence=0.95)
+    unpaired = newcombe_difference(baseline, candidate, paired=False, confidence=0.95)
+    assert paired[0] <= -0.05 <= paired[1]
+    assert paired[1] - paired[0] < unpaired[1] - unpaired[0]
+
+
+def test_wilson_and_binary_helpers() -> None:
+    low, high = wilson_interval(0, 30, 1.959964)
+    assert low == 0.0
+    assert high == pytest.approx(0.1135, abs=1e-4)
+    assert is_binary([0.0, 1.0, 1.0])
+    assert not is_binary([0.0, 0.5])
+    with pytest.raises(ValueError, match="n > 0"):
+        wilson_interval(0, 0, 1.96)

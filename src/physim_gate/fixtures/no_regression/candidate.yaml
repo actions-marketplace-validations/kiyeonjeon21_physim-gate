@@ -7,7 +7,7 @@ policy: {id: grasp-policy, version: 1.4.0}
 source: {repository: "https://example.com/acme/manipulation-stack.git", commit: 9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b, branch: refactor-grasp-planner, dirty: false}
 created_at: "2026-10-01T09:30:00Z"
 seed: 2291
-trials: 120
+trials: 300
 first_trial_seed: 1000
 failure_probability: 0.01
 failure_kind: physics_instability

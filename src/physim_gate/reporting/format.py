@@ -41,3 +41,27 @@ def direction_label(metric: MetricComparison) -> str:
 
 def percent(value: float | None) -> str:
     return "-" if value is None else f"{value * 100:+.1f}%"
+
+
+_METHOD_LABELS = {
+    "paired_bootstrap": "paired bootstrap",
+    "unpaired_bootstrap": "unpaired bootstrap",
+    "paired_newcombe": "paired score interval (Newcombe)",
+    "unpaired_newcombe": "unpaired score interval (Newcombe)",
+}
+
+
+def method_label(metric: MetricComparison) -> str | None:
+    """Human-readable name of the interval method, with the resample count for bootstraps."""
+    method = metric.evidence.method
+    if method is None:
+        return None
+    label = _METHOD_LABELS.get(method, method.replace("_", " "))
+    if metric.evidence.resamples is not None:
+        label += f", {metric.evidence.resamples} resamples"
+    return label
+
+
+def interval_kind(metric: MetricComparison) -> str:
+    method = metric.evidence.method or ""
+    return "score interval" if method.endswith("newcombe") else "bootstrap interval"

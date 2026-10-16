@@ -419,3 +419,59 @@ def test_comparison_is_reproducible(monkeypatch: pytest.MonkeyPatch) -> None:
     first = compare_runs(b, c, config).model_dump_json()
     assert first == compare_runs(b, c, config).model_dump_json()
     assert '"generated_at":"2023-11-14T22:13:20Z"' in first
+
+
+# --- binary metrics (regression tests for the zero-event false PASS) -----------------------
+
+
+def test_zero_events_in_both_runs_do_not_prove_non_inferiority() -> None:
+    # Before v0.1.1 the bootstrap gave a zero-width interval here and the gate said PASS,
+    # although 0 of 30 is compatible with a true collision rate of about 11%.
+    zeros = [0.0] * 30
+    metric, result = compare(
+        zeros, zeros, direction="lower_is_better", config=gate(max_absolute_degradation=0.02)
+    )
+    assert metric.evidence.method == "paired_newcombe"
+    assert metric.evidence.degradation_ci is not None
+    assert metric.evidence.degradation_ci[1] > 0.02
+    assert metric.verdict is Verdict.INCONCLUSIVE
+    assert result.exit_code == 3
+
+
+def test_candidate_without_events_is_not_a_pass_with_few_trials() -> None:
+    base = [1.0] + [0.0] * 29
+    cand = [0.0] * 30
+    config = gate(max_absolute_degradation=0.02, pairing="unpaired")
+    metric, _ = compare(base, cand, direction="lower_is_better", config=config)
+    assert metric.evidence.method == "unpaired_newcombe"
+    assert metric.verdict is Verdict.INCONCLUSIVE
+
+
+def test_binary_regression_is_still_detected() -> None:
+    base = [0.0] * 200
+    cand = [1.0] * 40 + [0.0] * 160
+    metric, _ = compare(
+        base, cand, direction="lower_is_better", config=gate(max_absolute_degradation=0.02)
+    )
+    assert metric.verdict is Verdict.FAIL
+    assert metric.evidence.resamples is None
+    assert metric.evidence.seed is None
+
+
+def test_binary_higher_is_better_sign() -> None:
+    base = [1.0] * 190 + [0.0] * 10
+    cand = [1.0] * 150 + [0.0] * 50
+    metric, _ = compare(base, cand, config=gate(max_absolute_degradation=0.05, pairing="unpaired"))
+    assert metric.numerical.degradation == pytest.approx(0.2)
+    ci = metric.evidence.degradation_ci
+    assert ci is not None
+    assert ci[0] > 0.05
+    assert metric.verdict is Verdict.FAIL
+
+
+def test_binary_median_keeps_the_bootstrap() -> None:
+    values = [1.0, 0.0] * 20
+    metric, _ = compare(
+        values, values, config=gate(max_absolute_degradation=0.5, statistic="median")
+    )
+    assert metric.evidence.method == "paired_bootstrap"
