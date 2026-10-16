@@ -1,0 +1,17 @@
+name: Verdict question
+description: A comparison verdict looks wrong or is hard to interpret
+labels: [statistics]
+body:
+  - type: textarea
+    id: comparison
+    attributes:
+      label: Comparison
+      description: Attach or paste the comparison.json (it embeds the config, samples and provenance).
+    validations:
+      required: true
+  - type: textarea
+    id: concern
+    attributes:
+      label: Why the verdict seems wrong
+    validations:
+      required: true

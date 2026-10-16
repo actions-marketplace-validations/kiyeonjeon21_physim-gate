@@ -1,0 +1,21 @@
+name: Adapter request
+description: Ask for, or propose, support for a simulator or result format
+labels: [adapter]
+body:
+  - type: input
+    id: simulator
+    attributes:
+      label: Simulator or tool
+    validations:
+      required: true
+  - type: textarea
+    id: format
+    attributes:
+      label: Result format
+      description: What files does it write per run and per episode? Link documentation or attach a small synthetic sample.
+    validations:
+      required: true
+  - type: textarea
+    id: metrics
+    attributes:
+      label: Metrics you would gate on

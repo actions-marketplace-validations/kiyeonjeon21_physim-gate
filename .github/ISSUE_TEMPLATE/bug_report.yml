@@ -1,0 +1,29 @@
+name: Bug report
+description: Something crashes, errors, or produces wrong output
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Include the exact command and its output.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: Minimal run results and gate.yaml, or the comparison.json. Use synthetic data if the originals are confidential.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `physim-gate --version`, Python version and OS.
+    validations:
+      required: true
