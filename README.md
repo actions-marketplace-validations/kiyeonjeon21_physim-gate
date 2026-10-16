@@ -354,7 +354,7 @@ PhySim Gate makes a narrow, explicit claim, and it is worth knowing where that c
 On GitHub Actions, use the action in this repository:
 
 ```yaml
-- uses: kiyeonjeon21/physim-gate@v0.2.0
+- uses: kiyeonjeon21/physim-gate@v0.3.0
   with:
     baseline: results/baseline.json
     candidate: results/candidate.json

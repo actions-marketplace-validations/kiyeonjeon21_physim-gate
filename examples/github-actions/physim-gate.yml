@@ -33,7 +33,7 @@ jobs:
         id: gate
         # Installs physim-gate from the same tag, sets up Python, writes the Markdown summary
         # to the job summary and fails the step unless the gate passes.
-        uses: kiyeonjeon21/physim-gate@v0.2.0
+        uses: kiyeonjeon21/physim-gate@v0.3.0
         with:
           baseline: results/baseline.json
           candidate: results/candidate.json

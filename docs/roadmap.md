@@ -21,7 +21,7 @@ v0.1.1 fixed the findings of the [OSS readiness review](oss-readiness-review.md)
 - **GitHub Action** (`uses: kiyeonjeon21/physim-gate@<tag>`) with job summary, outputs and an updating pull-request comment.
 - **PyPI release** under `physim-gate`, published by a release workflow with trusted publishing.
 
-## v0.3 (on main)
+## v0.3
 
 - **Expanded percentile bootstrap** by default. Per-side error at the margin with 10 trials fell from up to 5.5% to at most 3.5%. BCa was measured too and did not help.
 - **Paired and pilot-based planning.** `plan --discordance` simulates paired 0/1 metrics; `plan --from comparison.json` plans every metric of a pilot.
