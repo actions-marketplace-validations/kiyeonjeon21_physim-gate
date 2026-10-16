@@ -26,6 +26,7 @@ your sim job ──> candidate.json ┘          │                 comparison.
 - [Example report](#example-report)
 - [Real simulator data: LeRobot](#real-simulator-data-lerobot)
 - [How many trials do you need?](#how-many-trials-do-you-need)
+- [Baselines and suites](#baselines-and-suites)
 - [How the verdict is reached](#how-the-verdict-is-reached)
 - [Statistical limitations](#statistical-limitations)
 - [CI usage](#ci-usage)
@@ -250,7 +251,59 @@ To show that an unchanged 90% success rate has not dropped by more than 5 points
 With 50 episodes per run, a common size for robot evaluations, the gate says `INCONCLUSIVE` about 9 times in 10, and that is the correct answer for so little data.
 For 0/1 metrics the probabilities are exact: every possible outcome is weighted by its binomial probability and decided with the engine's own score interval.
 Pass `--true-degradation` to size a run that should detect a regression, and `--stdev` instead of `--rate` for continuous metrics (a normal approximation).
+
+Runs that share trial conditions are compared as pairs, which can need far fewer trials.
+How much depends on how often the two runs disagree on the same condition, so paired 0/1 plans take `--discordance` and are simulated with the engine's paired interval: if baseline and candidate disagree on 4% of conditions, the example above needs 173 trials instead of 573.
+
+The easiest input is a pilot.
+After a comparison came out `INCONCLUSIVE`, `physim-gate plan --from comparison.json` plans every gated metric from the pilot's own rates, spreads, pairing and margins, assuming the observed degradation is the true one:
+
+```text
+$ physim-gate plan --from comparison.json      # the LeRobot PushT comparison above
+metric     ┃   pilot n ┃ degradation ┃ margin ┃ goal ┃ trials per run ┃ P(goal)
+━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━╇━━━━━━━━━━━━━━━━╇━━━━━━━━
+success    │ 100 pairs │        +0.1 │   0.05 │ FAIL │            317 │   80.4%
+max_reward │ 100 pairs │     +0.1566 │   0.05 │ FAIL │            157 │   80.1%
+sum_reward │ 100 pairs │      -27.47 │  8.283 │ PASS │             53 │   80.4%
+```
+
 [docs/comparison-semantics.md](docs/comparison-semantics.md#planning-the-number-of-trials) has the details.
+
+## Baselines and suites
+
+A baseline is just a run result, but keeping track of which file is "the baseline for this scenario on main" is tedious.
+`physim-gate baseline` keeps them as plain files in `.physim-gate/baselines/<scenario>/<name>.json`, ready to commit:
+
+```bash
+physim-gate baseline save -a lerobot -O start_seed=1000 eval/main/   # stored as pusht @main
+physim-gate baseline list
+physim-gate compare -a lerobot -O start_seed=1000 -b @main -c eval/pr-42/ -g gate.yaml
+```
+
+`-b @main` picks the stored baseline named `main` for the candidate's scenario, whatever adapter reads the candidate.
+`--store DIR` or `PHYSIM_GATE_STORE` moves the store.
+
+To gate several scenarios at once, list them in a suite file:
+
+```yaml
+version: 1
+defaults:
+  adapter: lerobot
+  adapter_options: {start_seed: "1000"}
+  config: gate.yaml
+scenarios:
+  pusht:
+    baseline: "@main"
+    candidate: eval/pr-42/pusht
+  metaworld:
+    baseline: "@main"
+    candidate: eval/pr-42/metaworld
+    config: metaworld-gate.yaml
+```
+
+`physim-gate suite suite.yaml -o reports/` compares every scenario, writes the usual reports per scenario, and adds `suite.json`, a combined `junit.xml` (one test suite per scenario) and a combined `summary.md`.
+One scenario that cannot be read does not stop the others.
+The exit code is the most severe one: 2 if any scenario could not be compared, else 1 if any regressed, else 3 if any is blocked, else 0.
 
 ## How the verdict is reached
 
@@ -393,14 +446,15 @@ With the `gymnasium` extra, `physim_gate.adapters.gymnasium.run_gymnasium(env_id
 
 ## Supported and not supported
 
-| Capability | Status in v0.2.0 |
+| Capability | Status in v0.3.0 |
 |---|---|
 | Run-result schema 1.0 (JSON), JSON Schema export | Supported |
-| Baseline vs candidate comparison, paired and unpaired bootstrap | Supported |
+| Baseline vs candidate comparison, paired and unpaired (expanded percentile bootstrap, Newcombe score intervals) | Supported |
+| Baseline store (`physim-gate baseline`, `-b @name`) and multi-scenario suites (`physim-gate suite`) | Supported |
 | Absolute, relative and combined margins; mean or median | Supported |
 | Terminal, JSON, JUnit XML, Markdown and self-contained HTML output | Supported |
 | GitHub Action with pull-request comments | Supported |
-| Sample-size planning (`physim-gate plan`) | Supported: exact for unpaired 0/1 metrics, approximate for continuous ones |
+| Sample-size planning (`physim-gate plan`, also from a pilot comparison) | Supported: exact for unpaired 0/1 metrics, simulated for paired ones, approximate for continuous ones |
 | Third-party adapters via entry points | Supported |
 | Built-in adapters: `json`, `synthetic` (demo/tests) | Supported |
 | `gymnasium` adapter (optional extra, CPU classic-control environments tested) | Supported, tested with CartPole only |
@@ -414,8 +468,8 @@ With the `gymnasium` extra, `physim_gate.adapters.gymnasium.run_gymnasium(env_id
 ## Roadmap
 
 The near-term plan is in [docs/roadmap.md](docs/roadmap.md).
-Next up: more accurate intervals at small sample sizes, paired sample-size planning, a baseline store keyed by scenario, and multi-scenario suites.
-Later versions look at ROS 2 bag and PX4 SITL log adapters and trajectory-level metrics.
+Next up: stratified verdicts by trial labels, equivalence gates, and adapters for ROS 2 bags and PX4 SITL logs that can be tested from recorded fixtures.
+Later versions look at trajectory-level metrics.
 
 ## Contributing and license
 

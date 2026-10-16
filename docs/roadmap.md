@@ -21,20 +21,25 @@ v0.1.1 fixed the findings of the [OSS readiness review](oss-readiness-review.md)
 - **GitHub Action** (`uses: kiyeonjeon21/physim-gate@<tag>`) with job summary, outputs and an updating pull-request comment.
 - **PyPI release** under `physim-gate`, published by a release workflow with trusted publishing.
 
+## v0.3 (on main)
+
+- **Expanded percentile bootstrap** by default. Per-side error at the margin with 10 trials fell from up to 5.5% to at most 3.5%. BCa was measured too and did not help.
+- **Paired and pilot-based planning.** `plan --discordance` simulates paired 0/1 metrics; `plan --from comparison.json` plans every metric of a pilot.
+- **Baseline store.** `physim-gate baseline save/list/path` and `--baseline @name`, file-based and Git-friendly.
+- **Suites.** `physim-gate suite` gates several scenarios with one exit code, a JUnit test suite per scenario and one Markdown summary.
+- **Cross-checks** of the statistics against scipy and statsmodels in the test suite.
+
 ## Next
 
-1. **Small-sample bootstrap accuracy.** The study shows about 4-5.5% per-side error at 10 trials. Evaluate BCa or studentized intervals, or a higher default `min_samples`, against the same study.
-2. **Paired sample-size planning.** Pairing usually needs fewer trials; planning currently assumes unpaired runs.
-3. **Baseline management.** A small local store (`physim-gate baseline save/show`) keyed by scenario and branch, still file-based and Git-friendly.
-4. **Multi-run suites.** One config that gates several scenarios at once and aggregates verdicts, with per-scenario JUnit suites.
-5. **More real LeRobot data.** Multi-task suites such as LIBERO, which need a GPU-capable environment to produce.
+1. **Stratified comparisons** by trial labels (task, weather, terrain), with per-stratum verdicts; LeRobot already labels each episode with its task.
+2. **Equivalence gates** for "must not change in either direction" checks (calibration, determinism audits).
+3. **More real data.** LIBERO needs Linux; a recorded MetaWorld or LIBERO fixture would cover multi-task output in CI.
+4. **ROS 2 bag and PX4 SITL adapters** from recorded fixtures, with user-defined metric extraction.
 
 ## Later
 
-- Adapters for ROS 2 bags (with user-defined metric extraction), PX4 SITL ULog files, and CARLA ScenarioRunner or Leaderboard results. Each only when it can be tested in CI without the full simulator, using recorded fixtures.
+- A CARLA ScenarioRunner or Leaderboard adapter, only when it can be tested in CI from recorded results.
 - Trajectory- and time-series-level metrics (for example maximum deviation over a rollout) computed by adapters into per-trial scalars, with helpers.
-- Equivalence-style gates for "must not improve either" checks (calibration, determinism audits).
-- Stratified comparisons by trial labels (weather, terrain, object type), with per-stratum verdicts.
 - Optional NumPy acceleration for very large trial counts, kept out of the default install.
 
 ## Explicitly out of scope

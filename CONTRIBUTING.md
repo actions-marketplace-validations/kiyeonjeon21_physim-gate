@@ -34,7 +34,7 @@ Tests for optional integrations skip automatically when the integration is not i
 
 - **Statistical changes need a written rationale.** Update [docs/comparison-semantics.md](docs/comparison-semantics.md) in the same pull request, and add tests that pin the new behavior, including edge cases (zero baselines, missing values, tiny samples).
 - **Do not claim support you have not tested.** A new adapter needs fixtures and tests that run in CI without the simulator installed.
-- **Schema changes are versioned.** Additive, optional fields bump the minor version. Anything else bumps the major version and needs a migration note. Regenerate `schemas/*.json` with `physim-gate schema run|comparison|config`; a test fails if they drift.
+- **Schema changes are versioned.** Additive, optional fields bump the minor version. Anything else bumps the major version and needs a migration note. Regenerate `schemas/*.json` with `physim-gate schema run|comparison|config`; a test fails if any of the three drifts.
 - **Fixtures are generated.** Edit the YAML specs under `src/physim_gate/fixtures/` and regenerate `examples/highway-merge/*.json` (see `tests/test_examples.py`). Do not hand-edit generated JSON.
 - **No proprietary data.** Use synthetic data, or output you produced yourself from public simulators and checkpoints, with a README that says exactly how to reproduce it (see `examples/lerobot-pusht/`). Do not add proprietary datasets, logs or code.
 - **Keep dependencies small.** New runtime dependencies need a strong reason.

@@ -22,7 +22,9 @@ The review itself is unchanged below; this section records what happened to the 
 - **#14, sample-size guidance: addressed.** `physim-gate plan` computes how many trials a verdict needs, exactly for unpaired 0/1 metrics and by normal approximation for continuous ones. See [comparison-semantics.md](comparison-semantics.md#planning-the-number-of-trials).
 - **#28, real simulator data: addressed.** [`examples/lerobot-pusht/`](../examples/lerobot-pusht) gates real `lerobot-eval` output through the new `lerobot` adapter, and CI runs it through the GitHub Action.
 - **#23 and #24, hygiene: partly addressed.** Dependabot now covers GitHub Actions and pip, and `SECURITY.md` exists. Actions are still pinned by tag, and there is no code of conduct yet.
-- **Still open:** #13 (small-sample bootstrap accuracy), #15 to #22, #25 to #27.
+- **#13, small-sample bootstrap accuracy: addressed after v0.2.0.** The default is now Hesterberg's expanded percentile bootstrap; per-side error at the margin with 10 trials is at most 3.5% instead of up to 5.5%. BCa was measured and did not help. See [comparison-semantics.md](comparison-semantics.md#measured-error-rates).
+- **#18, reimplemented statistics: mitigated after v0.2.0.** `tests/test_crosscheck.py` checks the percentile bootstrap against `scipy.stats.bootstrap`, the t quantiles of the expanded interval against `scipy.stats.t`, and the unpaired Newcombe interval against `statsmodels`. The paired Newcombe interval (#17) still has no independent reference implementation.
+- **Still open:** #15 to #17, #19 to #22, #25 to #27.
 
 ## How the review was done
 

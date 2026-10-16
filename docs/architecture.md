@@ -25,7 +25,9 @@ Each stage can be used alone from Python, and the CLI is a thin layer over them.
 | `stats.py` | Dependency-free point estimates, quantiles, the paired/unpaired bootstrap, and Wilson/Newcombe score intervals for 0/1 metrics |
 | `engine.py` | `compare_runs()`: run-level checks, per-metric numerical, evidence and policy layers |
 | `comparison.py` | The versioned `ComparisonResult` models, verdict vocabulary and exit codes |
-| `planning.py` | `physim-gate plan`: trials needed for a verdict, exact for 0/1 metrics |
+| `planning.py` | `physim-gate plan`: trials needed for a verdict, exact for unpaired 0/1 metrics, simulated for paired ones, also from a pilot comparison |
+| `store.py` | The file-based baseline store and `@name` references |
+| `suite.py` | Suite files, running several comparisons, and the aggregated JUnit and Markdown outputs |
 | `provenance.py` | Environment capture, git provenance, file hashes, `SOURCE_DATE_EPOCH` |
 | `adapters/` | The adapter protocol, entry-point discovery, and the `json`, `synthetic`, `gymnasium` and `lerobot` adapters |
 | `reporting/` | Terminal (rich), JUnit XML, Markdown and self-contained HTML renderers |
