@@ -3,6 +3,25 @@
 All notable changes to this project are documented here.
 This file is generated from the commit history by git-cliff.
 
+## [0.3.0] - 2026-10-16
+
+### Features
+
+- **stats:** Use the expanded percentile bootstrap by default
+- Paired and pilot-based planning, a baseline store and suites
+
+### Bug fixes
+
+- **report:** Keep Markdown table values on one line in narrow comments
+- **terminal:** Never truncate the metric table
+- **suite:** Never wrap the path in a scenario's error message
+
+### Documentation
+
+- Describe planning from a pilot, baselines, suites and the new bootstrap
+- **examples:** Add real multi-task MetaWorld output and a suite example
+- Regenerate report screenshots for the expanded percentile bootstrap
+
 ## [0.2.0] - 2026-10-16
 
 ### Features
