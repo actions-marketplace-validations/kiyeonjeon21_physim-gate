@@ -7,6 +7,7 @@ to the margin) both PASS and FAIL are errors, and each should occur in at most a
 
     python scripts/error_rate_study.py            # 400 repetitions per scenario (minutes)
     python scripts/error_rate_study.py --reps 1000
+    python scripts/error_rate_study.py --method percentile --match normal --sizes 10 20 30
 
 Results are deterministic for a given --reps. The study uses 2,000 bootstrap resamples per
 comparison (the default is 10,000) to keep the runtime reasonable.
@@ -78,12 +79,21 @@ def bernoulli(p_base: float, p_cand: float, rho: float = 0.0) -> Generator:
 
 
 def rates(
-    generate: Generator, n: int, direction: str, gate: dict[str, Any], reps: int
+    generate: Generator,
+    n: int,
+    direction: str,
+    gate: dict[str, Any],
+    reps: int,
+    method: str = "expanded_percentile",
 ) -> dict[str, float]:
     config = GateConfig.model_validate(
         {
             "version": 1,
-            "defaults": {"bootstrap_resamples": 2000, "min_samples": 2},
+            "defaults": {
+                "bootstrap_resamples": 2000,
+                "min_samples": 2,
+                "bootstrap_method": method,
+            },
             "metrics": {"m": gate},
         }
     )
@@ -125,12 +135,29 @@ SCENARIOS: list[tuple[str, Generator, str, dict[str, Any], tuple[int, ...]]] = [
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--reps", type=int, default=400)
+    parser.add_argument(
+        "--method",
+        choices=("expanded_percentile", "percentile"),
+        default="expanded_percentile",
+        help="bootstrap interval",
+    )
+    parser.add_argument(
+        "--sizes", type=int, nargs="*", help="override the trial counts of continuous scenarios"
+    )
+    parser.add_argument("--match", default="", help="only scenarios whose name contains this")
     args = parser.parse_args()
-    print(f"| scenario | n | PASS | FAIL | INCONCLUSIVE |  ({args.reps} repetitions each)")
+    print(
+        f"| scenario | n | PASS | FAIL | INCONCLUSIVE |  "
+        f"({args.reps} repetitions each, {args.method} bootstrap)"
+    )
     print("|---|---|---|---|---|")
     for name, generate, direction, gate, sizes in SCENARIOS:
+        if args.match not in name:
+            continue
+        if args.sizes and not name.startswith(("success", "collision")):
+            sizes = tuple(args.sizes)
         for n in sizes:
-            r = rates(generate, n, direction, gate, args.reps)
+            r = rates(generate, n, direction, gate, args.reps, args.method)
             print(
                 f"| {name} | {n} | {r['PASS']:.3f} | {r['FAIL']:.3f} | {r['INCONCLUSIVE']:.3f} |",
                 flush=True,

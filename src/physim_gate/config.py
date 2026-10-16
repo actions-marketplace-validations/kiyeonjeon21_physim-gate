@@ -23,6 +23,11 @@ class Statistic(StrEnum):
     MEDIAN = "median"
 
 
+class BootstrapMethod(StrEnum):
+    EXPANDED = "expanded_percentile"
+    PERCENTILE = "percentile"
+
+
 class Pairing(StrEnum):
     AUTO = "auto"
     PAIRED = "paired"
@@ -57,6 +62,7 @@ class Defaults(_Model):
     max_missing_fraction: Fraction = 0.0
     bootstrap_resamples: Resamples = 10_000
     bootstrap_seed: int = 0
+    bootstrap_method: BootstrapMethod = BootstrapMethod.EXPANDED
 
 
 class Policy(_Model):
@@ -104,6 +110,7 @@ class ResolvedMetricGate(_Model):
     max_missing_fraction: float
     bootstrap_resamples: int
     bootstrap_seed: int
+    bootstrap_method: BootstrapMethod
 
 
 class GateConfig(_Model):
@@ -132,6 +139,7 @@ class GateConfig(_Model):
             ),
             bootstrap_resamples=d.bootstrap_resamples,
             bootstrap_seed=d.bootstrap_seed,
+            bootstrap_method=d.bootstrap_method,
         )
 
 

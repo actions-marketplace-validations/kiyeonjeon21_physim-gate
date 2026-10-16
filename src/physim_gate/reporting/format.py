@@ -46,6 +46,8 @@ def percent(value: float | None) -> str:
 _METHOD_LABELS = {
     "paired_bootstrap": "paired bootstrap",
     "unpaired_bootstrap": "unpaired bootstrap",
+    "paired_bootstrap_expanded": "paired bootstrap, expanded percentile",
+    "unpaired_bootstrap_expanded": "unpaired bootstrap, expanded percentile",
     "paired_newcombe": "paired score interval (Newcombe)",
     "unpaired_newcombe": "unpaired score interval (Newcombe)",
 }

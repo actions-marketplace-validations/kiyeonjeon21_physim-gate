@@ -31,6 +31,7 @@ from physim_gate.comparison import (
     Verdict,
 )
 from physim_gate.config import (
+    BootstrapMethod,
     Correction,
     GateConfig,
     OnUncertain,
@@ -267,8 +268,11 @@ def _compare_metric(
             confidence=adjusted_confidence,
             resamples=gate.bootstrap_resamples,
             seed=bootstrap_seed,
+            method=gate.bootstrap_method,
         )
         method = "paired_bootstrap" if paired else "unpaired_bootstrap"
+        if gate.bootstrap_method is BootstrapMethod.EXPANDED:
+            method += "_expanded"
     excess_low, excess_high = boot.excess
     pct = _pct(adjusted_confidence)
     if excess_low > 0:

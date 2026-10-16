@@ -95,9 +95,9 @@ For paired comparisons the count is the number of pairs; for unpaired comparison
 Otherwise an interval of the degradation is computed.
 The method depends on the data.
 
-### Continuous metrics: percentile bootstrap
+### Continuous metrics: expanded percentile bootstrap
 
-Unless every value in both samples is exactly 0 or 1, a percentile bootstrap estimates the uncertainty of the degradation:
+Unless every value in both samples is exactly 0 or 1, a bootstrap estimates the uncertainty of the degradation:
 
 - **Paired:** resample pair indices with replacement, keeping each pair together, and recompute the statistic of each side.
 - **Unpaired:** resample each run's values independently.
@@ -105,6 +105,16 @@ Unless every value in both samples is exactly 0 or 1, a percentile bootstrap est
   For relative margins, `margin*` is recomputed from the replicate's baseline statistic, so uncertainty in the baseline's magnitude is propagated.
 - `bootstrap_resamples` (default 10,000) replicates are drawn from a pseudo-random generator seeded with `"<bootstrap_seed>:<metric name>"`. Results are therefore reproducible across machines.
 - The two-sided interval at `confidence` (default 0.95) is taken from the replicate quantiles (linear interpolation).
+- By default the quantiles are *expanded* for small samples (Hesterberg 2015, *The American Statistician* 69:371).
+  Instead of the `alpha/2` and `1 - alpha/2` quantiles, the interval uses `Phi(-+sqrt(n/(n-1)) * t)`, where `t` is the Student t quantile for `alpha/2`.
+  For pairs, `n` is the number of pairs and the t distribution has `n - 1` degrees of freedom; for two independent samples, `n` is the smaller sample and the degrees of freedom are `n_baseline + n_candidate - 2`.
+  At 10 trials this turns the 95% interval into roughly a 98% one; at 100 trials the change is negligible.
+
+The plain percentile interval is too narrow for small samples.
+In the study below it was wrong at the margin in up to 5.5% of runs per side with 10 trials, against a nominal 2.5%.
+The expanded interval brings that to at most 3.5%, and costs little power: with 100 trials, an unchanged metric still PASSed in 93.7% of runs, against 93.8% with plain percentiles.
+BCa intervals (bias-corrected and accelerated) were also measured, with an implementation checked against `scipy.stats.bootstrap`, and did not help: up to 7.6% per side with 10 skewed trials.
+Set `defaults.bootstrap_method: percentile` to reproduce comparisons made before v0.3.0.
 
 ### 0/1 metrics: Newcombe score interval
 
@@ -176,17 +186,17 @@ Teams that prefer to block only on demonstrated regressions can set `policy.on_i
 
 ## Measured error rates
 
-`scripts/error_rate_study.py` runs the real engine on synthetic data with a known true degradation, 1,000 times per row, at confidence 0.95 with 2,000 bootstrap resamples.
+`scripts/error_rate_study.py` runs the real engine on synthetic data with a known true degradation, 1,000 times per row, at confidence 0.95 with 2,000 bootstrap resamples and the default expanded percentile bootstrap.
 At the margin both PASS and FAIL are errors, and each should be at most about 2.5%.
 Away from the margin, the wrong verdict should be near 0 and the correct one should grow with the number of trials.
 
 | Scenario | Trials per run | PASS | FAIL | INCONCLUSIVE |
 |---|---|---|---|---|
-| Normal, unpaired, at margin | 10 / 30 / 100 | 3.8% / 2.6% / 1.9% | 4.2% / 3.0% / 2.8% | rest |
-| Normal, paired (correlation 0.8), at margin | 10 / 30 / 100 | 4.0% / 2.5% / 1.7% | 4.7% / 3.1% / 2.6% | rest |
-| Lognormal, mean +10%, relative margin 10% | 10 / 30 / 100 | 5.5% / 3.0% / 3.4% | 5.4% / 3.5% / 2.5% | rest |
-| Normal, unpaired, no change (correct: PASS) | 10 / 30 / 100 | 24.8% / 50.0% / 93.8% | 0.3% / 0% / 0% | rest |
-| Normal, unpaired, degradation 2x margin (correct: FAIL) | 10 / 30 / 100 | 0% / 0% / 0% | 24.0% / 50.5% / 94.5% | rest |
+| Normal, unpaired, at margin | 10 / 30 / 100 | 2.1% / 2.1% / 1.6% | 2.5% / 2.4% / 2.5% | rest |
+| Normal, paired (correlation 0.8), at margin | 10 / 30 / 100 | 2.5% / 2.3% / 1.7% | 3.1% / 2.6% / 2.6% | rest |
+| Lognormal, mean +10%, relative margin 10% | 10 / 30 / 100 | 3.5% / 2.4% / 3.1% | 3.5% / 3.2% / 2.4% | rest |
+| Normal, unpaired, no change (correct: PASS) | 10 / 30 / 100 | 18.0% / 47.4% / 93.7% | 0.3% / 0% / 0% | rest |
+| Normal, unpaired, degradation 2x margin (correct: FAIL) | 10 / 30 / 100 | 0% / 0% / 0% | 18.1% / 47.5% / 94.2% | rest |
 | Success 0.90 to 0.85, margin 0.05, unpaired, at margin | 30 / 100 / 300 | 2.4% / 3.2% / 2.9% | 2.5% / 2.8% / 2.1% | rest |
 | Success 0.90 to 0.85, margin 0.05, paired, at margin | 30 / 100 / 300 | 0.1% / 3.0% / 2.6% | 0.7% / 0.8% / 2.0% | rest |
 | Collision 0.01 to 0.03, margin 0.02, unpaired, at margin | 30 / 80 / 300 | 0% / 0.5% / 1.8% | 0% / 0.5% / 1.6% | rest |
@@ -195,7 +205,8 @@ Away from the margin, the wrong verdict should be near 0 and the correct one sho
 
 What this shows:
 
-- The bootstrap is somewhat anti-conservative with 10 trials (up to about 5.5% per side instead of 2.5%) and close to nominal from about 30 trials.
+- The expanded bootstrap stays close to nominal from 10 trials on: at most 3.5% per side, for skewed data with 10 trials. With plain percentiles the same rows reached 5.5% (v0.2 and earlier; `--method percentile` reproduces them).
+- The price is power at very small samples: with 10 trials an unchanged metric PASSes in 18% of runs instead of 25%. From about 30 trials the difference is a few points, and at 100 it is gone.
 - The score intervals for 0/1 metrics stay near or below nominal. For rare events they are conservative, which means many `INCONCLUSIVE` results unless there are hundreds of trials.
 - The Monte Carlo uncertainty of each percentage is roughly plus or minus 1 point.
 
@@ -255,6 +266,7 @@ defaults:
   max_missing_fraction: 0.0    # 0..1
   bootstrap_resamples: 10000   # 1000..1000000
   bootstrap_seed: 0
+  bootstrap_method: expanded_percentile   # expanded_percentile | percentile
 policy:
   on_inconclusive: fail        # fail | pass
   on_invalid: fail             # fail | pass

@@ -5,7 +5,10 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from pydantic import BaseModel
 
+from physim_gate.comparison import ComparisonResult
+from physim_gate.config import GateConfig
 from physim_gate.schema import (
     FAILURE_RATE_METRIC,
     InputError,
@@ -157,10 +160,19 @@ def test_failure_rate_is_derived_from_status() -> None:
     assert spec.direction.value == "lower_is_better"
 
 
-def test_published_json_schema_is_current() -> None:
+@pytest.mark.parametrize(
+    ("file", "model"),
+    [
+        ("run-result.schema.json", RunResult),
+        ("comparison.schema.json", ComparisonResult),
+        ("gate-config.schema.json", GateConfig),
+    ],
+)
+def test_published_json_schema_is_current(file: str, model: type[BaseModel]) -> None:
+    """Regenerate with: physim-gate schema run|comparison|config > schemas/<file>."""
     schemas = Path(__file__).parent.parent / "schemas"
-    published = json.loads((schemas / "run-result.schema.json").read_text())
-    assert published == RunResult.model_json_schema()
+    published = json.loads((schemas / file).read_text())
+    assert published == model.model_json_schema()
 
 
 def test_integers_too_large_for_a_float_are_rejected(tmp_path: Path) -> None:

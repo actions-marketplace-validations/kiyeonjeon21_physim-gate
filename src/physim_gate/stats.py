@@ -13,7 +13,7 @@ import statistics
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
-from physim_gate.config import Statistic
+from physim_gate.config import BootstrapMethod, Statistic
 
 StatFn = Callable[[Sequence[float]], float]
 
@@ -77,12 +77,16 @@ def bootstrap_degradation(
     confidence: float,
     resamples: int,
     seed: str,
+    method: BootstrapMethod = BootstrapMethod.EXPANDED,
 ) -> BootstrapResult:
     """Bootstrap the degradation of ``candidate`` relative to ``baseline``.
 
     Paired: trial indices are resampled jointly, preserving the pairing. Unpaired: each sample is
     resampled independently. The interval is two-sided at ``confidence``. Deciding on one side
     of it gives a one-sided error rate of about ``(1 - confidence) / 2``.
+
+    ``method`` picks the interval: plain percentiles, or Hesterberg's expanded percentiles
+    (the default), which widen the interval for small samples; see :func:`_expanded_alpha`.
     """
     if paired and len(baseline) != len(candidate):
         raise ValueError("paired samples must have equal length")
@@ -116,10 +120,84 @@ def bootstrap_degradation(
     alpha = 1.0 - confidence
     degradations.sort()
     excesses.sort()
+    levels = {"degradation": (alpha / 2, 1 - alpha / 2), "excess": (alpha / 2, 1 - alpha / 2)}
+    if method is BootstrapMethod.EXPANDED:
+        if paired:
+            n, df = len(baseline), len(baseline) - 1
+        else:
+            n, df = min(len(baseline), len(candidate)), len(baseline) + len(candidate) - 2
+        expanded = _expanded_alpha(alpha, n, df)
+        levels = dict.fromkeys(levels, (expanded / 2, 1 - expanded / 2))
     return BootstrapResult(
-        degradation=(quantile(degradations, alpha / 2), quantile(degradations, 1 - alpha / 2)),
-        excess=(quantile(excesses, alpha / 2), quantile(excesses, 1 - alpha / 2)),
+        degradation=(
+            quantile(degradations, levels["degradation"][0]),
+            quantile(degradations, levels["degradation"][1]),
+        ),
+        excess=(quantile(excesses, levels["excess"][0]), quantile(excesses, levels["excess"][1])),
     )
+
+
+def _expanded_alpha(alpha: float, n: int, df: int) -> float:
+    """Hesterberg's expanded percentile interval (2015, The American Statistician 69:371).
+
+    The percentile interval is too narrow for small samples, partly because the bootstrap uses
+    the plug-in variance (divisor n) and partly because it ignores the extra tail weight that a
+    t distribution would add. Both are undone by using the percentiles
+    ``Phi(+-sqrt(n / (n - 1)) * t[alpha/2, df])`` instead of ``alpha / 2``. For one sample (or
+    pairs) ``df = n - 1``; for two independent samples ``n`` is the smaller sample and
+    ``df = n_baseline + n_candidate - 2``.
+    """
+    if n < 2 or df < 1:
+        return alpha
+    t = _t_quantile(1 - alpha / 2, df)
+    return 2 * statistics.NormalDist().cdf(-math.sqrt(n / (n - 1)) * t)
+
+
+def _t_quantile(probability: float, df: int) -> float:
+    """Student t quantile by bisection on the CDF (regularized incomplete beta)."""
+
+    def cdf(x: float) -> float:
+        beta = _regularized_beta(df / (df + x * x), df / 2, 0.5)
+        return 1 - beta / 2 if x >= 0 else beta / 2
+
+    low, high = 0.0, 1000.0
+    for _ in range(200):
+        mid = (low + high) / 2
+        if cdf(mid) < probability:
+            low = mid
+        else:
+            high = mid
+    return (low + high) / 2
+
+
+def _regularized_beta(x: float, a: float, b: float) -> float:
+    """I_x(a, b) by Lentz's continued fraction (Numerical Recipes, section 6.4)."""
+    if x <= 0:
+        return 0.0
+    if x >= 1:
+        return 1.0
+    log_front = (
+        math.lgamma(a + b) - math.lgamma(a) - math.lgamma(b) + a * math.log(x) + b * math.log1p(-x)
+    )
+    if x > (a + 1) / (a + b + 2):
+        return 1.0 - _regularized_beta(1 - x, b, a)
+    tiny = 1e-300
+    c, d = 1.0, 1.0 - (a + b) * x / (a + 1)
+    d = 1.0 / (d if abs(d) > tiny else tiny)
+    result = d
+    for m in range(1, 300):
+        for numerator in (
+            m * (b - m) * x / ((a + 2 * m - 1) * (a + 2 * m)),
+            -(a + m) * (a + b + m) * x / ((a + 2 * m) * (a + 2 * m + 1)),
+        ):
+            d = 1.0 + numerator * d
+            d = 1.0 / (d if abs(d) > tiny else tiny)
+            c = 1.0 + numerator / c
+            c = c if abs(c) > tiny else tiny
+            result *= c * d
+        if abs(c * d - 1.0) < 1e-15:
+            break
+    return math.exp(log_front) * result / a
 
 
 def is_binary(values: Sequence[float]) -> bool:
@@ -161,22 +239,37 @@ def newcombe_difference(
     nb, nc = len(baseline), len(candidate)
     xb, xc = round(sum(baseline)), round(sum(candidate))
 
-    phi = 0.0
     if paired:
         if nb != nc:
             raise ValueError("paired samples must have equal length")
         both = sum(1 for b, c in zip(baseline, candidate, strict=True) if b == 1 and c == 1)
-        base_only = xb - both
-        cand_only = xc - both
-        neither = nb - both - base_only - cand_only
-        denominator = math.sqrt(xb * (nb - xb) * xc * (nc - xc))
-        if denominator > 0:
-            cross = float(both * neither - base_only * cand_only)
-            if cross > 0:
-                cross = max(cross - nb / 2, 0.0)
-            phi = cross / denominator
+        return newcombe_paired_counts(
+            both, xb - both, xc - both, nb - xb - xc + both, confidence=confidence
+        )
+    return _newcombe_combine(xb, nb, xc, nc, z, 0.0)
 
-    return _newcombe_combine(xb, nb, xc, nc, z, phi)
+
+def newcombe_paired_counts(
+    both: int, base_only: int, cand_only: int, neither: int, *, confidence: float
+) -> Interval:
+    """Paired Newcombe interval (method 10) from the four cells of the 2x2 table of pairs.
+
+    ``both`` counts pairs where baseline and candidate are 1, ``base_only`` pairs where only the
+    baseline is 1, and so on. The interval is for ``rate(candidate) - rate(baseline)``.
+    """
+    n = both + base_only + cand_only + neither
+    if n <= 0:
+        raise ValueError("newcombe_paired_counts needs at least one pair")
+    z = statistics.NormalDist().inv_cdf(1 - (1 - confidence) / 2)
+    xb, xc = both + base_only, both + cand_only
+    phi = 0.0
+    denominator = math.sqrt(xb * (n - xb) * xc * (n - xc))
+    if denominator > 0:
+        cross = float(both * neither - base_only * cand_only)
+        if cross > 0:
+            cross = max(cross - n / 2, 0.0)
+        phi = cross / denominator
+    return _newcombe_combine(xb, n, xc, n, z, phi)
 
 
 def newcombe_counts(xb: int, nb: int, xc: int, nc: int, confidence: float) -> Interval:

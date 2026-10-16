@@ -27,7 +27,7 @@ echo $?   # 1: regression detected
 | Metric | Baseline | Candidate | Verdict | Why |
 |---|--:|--:|---|---|
 | `success` | 0.11 | 0.01 | INCONCLUSIVE | The drop is 10 points, but with 100 episodes the 95% interval is +3.4 to +17.7 points and includes the 5-point margin |
-| `max_reward` | 0.711 | 0.554 | FAIL | The whole interval (+0.065 to +0.252) lies above the 0.05 margin |
+| `max_reward` | 0.711 | 0.554 | FAIL | The whole interval (+0.064 to +0.254) lies above the 0.05 margin |
 | `sum_reward` (optional) | 82.8 | 110.3 | PASS | It improves, while the other two metrics got worse |
 
 The gate fails because of `max_reward`.

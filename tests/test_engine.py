@@ -215,7 +215,7 @@ def test_auto_pairs_when_trial_ids_match() -> None:
     metric, _ = compare(ramp(10), ramp(9.9))
     assert metric.pairing.mode == "paired"
     assert metric.pairing.n_pairs == N
-    assert metric.evidence.method == "paired_bootstrap"
+    assert metric.evidence.method == "paired_bootstrap_expanded"
 
 
 def test_pairing_reduces_uncertainty_for_shared_conditions() -> None:
@@ -234,7 +234,7 @@ def test_auto_falls_back_to_unpaired_when_ids_differ() -> None:
     metric, _ = compare(ramp(10), ramp(10), base_ids=ids_b, cand_ids=ids_c)
     assert metric.pairing.mode == "unpaired"
     assert "independent samples" in (metric.pairing.note or "")
-    assert metric.evidence.method == "unpaired_bootstrap"
+    assert metric.evidence.method == "unpaired_bootstrap_expanded"
 
 
 def test_unpaired_samples_may_have_different_sizes() -> None:
@@ -474,4 +474,25 @@ def test_binary_median_keeps_the_bootstrap() -> None:
     metric, _ = compare(
         values, values, config=gate(max_absolute_degradation=0.5, statistic="median")
     )
-    assert metric.evidence.method == "paired_bootstrap"
+    assert metric.evidence.method == "paired_bootstrap_expanded"
+
+
+def test_percentile_bootstrap_remains_available() -> None:
+    values = [float(i % 7) for i in range(12)]
+    base = make_run({"m": values}, run_id="b")
+    cand = make_run(
+        {"m": [v + 0.2 + 0.3 * ((3 * i) % 5 - 2) for i, v in enumerate(values)]}, run_id="c"
+    )
+    gate = {"m": {"max_absolute_degradation": 1.0}}
+    expanded = compare_runs(base, cand, make_config(gate)).metrics[0]
+    plain = compare_runs(
+        base, cand, make_config(gate, defaults={"bootstrap_method": "percentile"})
+    ).metrics[0]
+    assert plain.evidence.method == "paired_bootstrap"
+    assert expanded.evidence.method == "paired_bootstrap_expanded"
+    assert plain.evidence.degradation_ci is not None
+    assert expanded.evidence.degradation_ci is not None
+    # The expanded interval is wider at small n.
+    plain_width = plain.evidence.degradation_ci[1] - plain.evidence.degradation_ci[0]
+    expanded_width = expanded.evidence.degradation_ci[1] - expanded.evidence.degradation_ci[0]
+    assert expanded_width > plain_width

@@ -87,7 +87,7 @@ def test_html_is_self_contained_and_escaped() -> None:
     assert "- · statistic" not in html
     assert "None resamples" not in html
     assert "paired score interval (Newcombe)" in html  # the binary "crash" metric
-    assert "paired bootstrap, 10000 resamples" in html
+    assert "paired bootstrap, expanded percentile, 10000 resamples" in html
 
 
 def test_markdown_summary() -> None:

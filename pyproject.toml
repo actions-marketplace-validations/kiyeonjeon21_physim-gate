@@ -51,6 +51,9 @@ dev = [
   "pytest-cov>=5.0",
   "ruff>=0.6",
   "types-PyYAML>=6.0",
+  # Only for tests/test_crosscheck.py, which checks the statistics against these libraries.
+  "scipy>=1.11",
+  "statsmodels>=0.14",
 ]
 
 [project.urls]

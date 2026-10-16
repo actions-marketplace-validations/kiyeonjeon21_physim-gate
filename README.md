@@ -184,9 +184,9 @@ candidate highway-merge-planner-2.1.0-pr-3140  80 trials | policy motion-planner
 metric                  ┃ baseline ┃ candidate ┃ degradation ┃              interval ┃ margin ┃  n ┃ verdict
 ━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━╇━━━━━━━━
 collision ↓             │   0.0375 │      0.15 │     +0.1125 │   [+0.03042, +0.2051] │   0.02 │ 80 │ FAIL
-min_time_to_collision ↑ │     3.16 │     2.654 │     +0.5058 │    [+0.4351, +0.5762] │    0.2 │ 80 │ FAIL
-lateral_error_rms ↓     │    0.214 │    0.2175 │   +0.003511 │ [-0.006523, +0.01374] │ 0.0214 │ 80 │ PASS
-jerk_p95 ↓ (optional)   │    2.359 │     2.392 │     +0.0324 │  [-0.02637, +0.09338] │ 0.2359 │ 80 │ PASS
+min_time_to_collision ↑ │     3.16 │     2.654 │     +0.5058 │    [+0.4328, +0.5778] │    0.2 │ 80 │ FAIL
+lateral_error_rms ↓     │    0.214 │    0.2175 │   +0.003511 │ [-0.006654, +0.01395] │ 0.0214 │ 80 │ PASS
+jerk_p95 ↓ (optional)   │    2.359 │     2.392 │     +0.0324 │   [-0.02786, +0.0946] │ 0.2359 │ 80 │ PASS
 degradation > 0 means worse; interval = confidence interval of the degradation; n = matched pairs or
 baseline/candidate observations
 
@@ -276,7 +276,7 @@ The built-in metric `physim.failure_rate`, derived from each trial's status, let
 
 PhySim Gate makes a narrow, explicit claim, and it is worth knowing where that claim is weak:
 
-- **The intervals are approximate.** In a [Monte Carlo study](docs/comparison-semantics.md#measured-error-rates) of the real engine, a metric whose true degradation equals the margin was wrongly called PASS or FAIL in about 2-3.5% of runs each with 30 or more trials, but up to about 5.5% each with 10 trials. `min_samples` (default 10) is a floor, not a guarantee.
+- **The intervals are approximate.** In a [Monte Carlo study](docs/comparison-semantics.md#measured-error-rates) of the real engine, a metric whose true degradation equals the margin was wrongly called PASS or FAIL in at most 3.5% of runs on each side, including with only 10 trials; the nominal rate is 2.5%. `min_samples` (default 10) is a floor, not a guarantee.
 - **Rare events need many trials.** With a 1% baseline collision rate and a 2-point margin, 80 trials per run give `INCONCLUSIVE` about 89% of the time, even when the candidate's true rate is 6%. That is the honest answer for so little data. `physim-gate plan` tells you how many trials a decision needs.
 - **Each metric is tested separately.** With many gated metrics, the chance that at least one shows a spurious regression grows. `policy.correction: bonferroni` is available but off by default.
 - **Seeds do not make physics deterministic.** Matching `trial_id`s are treated as matched *conditions*. Pairing reduces noise from shared conditions; it does not assume bitwise-identical rollouts.

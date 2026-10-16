@@ -1,5 +1,13 @@
 {
   "$defs": {
+    "BootstrapMethod": {
+      "enum": [
+        "expanded_percentile",
+        "percentile"
+      ],
+      "title": "BootstrapMethod",
+      "type": "string"
+    },
     "Correction": {
       "enum": [
         "none",
@@ -50,6 +58,10 @@
           "default": 0,
           "title": "Bootstrap Seed",
           "type": "integer"
+        },
+        "bootstrap_method": {
+          "$ref": "#/$defs/BootstrapMethod",
+          "default": "expanded_percentile"
         }
       },
       "title": "Defaults",
