@@ -114,6 +114,14 @@ jobs:
           test "$REGRESSION_CODE" = 1
           test "$LEROBOT_VERDICT" = PASS
           for f in comparison.json junit.xml report.html summary.md; do test -s "$LEROBOT_DIR/$f"; done
+      - name: Suite of both LeRobot examples (expected to report a regression, exit code 1)
+        run: |
+          set +e
+          physim-gate suite examples/lerobot-suite.yaml -o "$RUNNER_TEMP/suite"
+          code=$?
+          set -e
+          cat "$RUNNER_TEMP/suite/summary.md" >> "$GITHUB_STEP_SUMMARY"
+          test "$code" -eq 1
 
   package:
     runs-on: ubuntu-latest

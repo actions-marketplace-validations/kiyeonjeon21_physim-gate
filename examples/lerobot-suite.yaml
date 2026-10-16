@@ -1,0 +1,17 @@
+# Gate both LeRobot examples with one command:
+#   physim-gate suite examples/lerobot-suite.yaml -o suite-report
+# Paths are relative to this file. Expected: pusht FAIL, metaworld PASS, exit code 1.
+version: 1
+defaults:
+  adapter: lerobot
+  adapter_options: {start_seed: "1000"}
+scenarios:
+  pusht:
+    baseline: lerobot-pusht/baseline
+    candidate: lerobot-pusht/candidate-n-action-steps-8
+    config: lerobot-pusht/gate.yaml
+  metaworld:
+    baseline: lerobot-metaworld/baseline
+    candidate: lerobot-metaworld/candidate-n-action-steps-10
+    config: lerobot-metaworld/gate.yaml
+    adapter_options: {start_seed: "1000", scenario: metaworld}

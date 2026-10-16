@@ -1,0 +1,15 @@
+# Gate for LeRobot MetaWorld evaluations (see README.md in this directory).
+version: 1
+defaults:
+  confidence: 0.95
+  min_samples: 30
+policy:
+  on_inconclusive: fail
+  on_invalid: fail
+metrics:
+  success:
+    # Success over all tasks may drop by at most 5 percentage points.
+    max_absolute_degradation: 0.05
+  max_reward:
+    max_relative_degradation: 0.05
+    required: false

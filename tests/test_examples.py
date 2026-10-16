@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from physim_gate.config import load_config
@@ -57,3 +58,40 @@ def test_lerobot_pusht_example_verdicts() -> None:
     assert success.evidence.degradation_ci is not None
     low, high = success.evidence.degradation_ci
     assert (round(low, 3), round(high, 3)) == (0.034, 0.177)
+
+
+def test_lerobot_metaworld_example_verdicts() -> None:
+    """Real multi-task output: four MetaWorld tasks, 25 episodes each."""
+    from physim_gate.adapters.base import get_adapter
+    from physim_gate.engine import compare_runs
+
+    folder = EXAMPLES / "lerobot-metaworld"
+    adapter = get_adapter("lerobot")
+    options = {"start_seed": "1000", "scenario": "metaworld"}
+    baseline = adapter.load(folder / "baseline", options)
+    candidate = adapter.load(folder / "candidate-n-action-steps-10", options)
+    assert len(baseline.trials) == 100
+    assert {t.labels["task_group"] for t in baseline.trials} == {
+        "reach-v3",
+        "button-press-v3",
+        "drawer-open-v3",
+        "door-open-v3",
+    }
+    result = compare_runs(baseline, candidate, load_config(folder / "gate.yaml"))
+    assert result.verdict.value == "PASS"
+    success = next(m for m in result.metrics if m.name == "success")
+    assert success.numerical is not None
+    assert (success.numerical.baseline, success.numerical.candidate) == (0.68, 0.84)
+
+
+def test_lerobot_suite_example(tmp_path: Path) -> None:
+    from typer.testing import CliRunner
+
+    from physim_gate.cli import app
+
+    result = CliRunner().invoke(
+        app, ["suite", str(EXAMPLES / "lerobot-suite.yaml"), "-o", str(tmp_path), "-f", "json"]
+    )
+    assert result.exit_code == 1, result.output
+    verdicts = {s["name"]: s["verdict"] for s in json.loads(result.stdout)["scenarios"]}
+    assert verdicts == {"pusht": "FAIL", "metaworld": "PASS"}

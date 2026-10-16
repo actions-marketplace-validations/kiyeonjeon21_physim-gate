@@ -33,7 +33,7 @@ v0.1.1 fixed the findings of the [OSS readiness review](oss-readiness-review.md)
 
 1. **Stratified comparisons** by trial labels (task, weather, terrain), with per-stratum verdicts; LeRobot already labels each episode with its task.
 2. **Equivalence gates** for "must not change in either direction" checks (calibration, determinism audits).
-3. **More real data.** LIBERO needs Linux; a recorded MetaWorld or LIBERO fixture would cover multi-task output in CI.
+3. **LIBERO output.** LeRobot installs LIBERO on Linux only; a recorded LIBERO evaluation would complete the real-data examples.
 4. **ROS 2 bag and PX4 SITL adapters** from recorded fixtures, with user-defined metric extraction.
 
 ## Later

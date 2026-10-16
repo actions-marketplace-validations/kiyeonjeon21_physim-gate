@@ -223,6 +223,7 @@ Its success rate fell from 11% to 1%, but with 100 episodes per run the interval
 `max_reward` dropped clearly enough to fail the gate.
 A second evaluation of the unchanged policy passes, because it reproduced every success flag exactly.
 The example's [README](examples/lerobot-pusht/README.md) explains the runs and how to reproduce them.
+[`examples/lerobot-metaworld/`](examples/lerobot-metaworld) does the same for a multi-task evaluation of a SmolVLA policy on four MetaWorld tasks, and [`examples/lerobot-suite.yaml`](examples/lerobot-suite.yaml) gates both examples with one command.
 
 Each episode becomes a trial with `success`, `sum_reward` and `max_reward`.
 `lerobot-eval` seeds episode `i` of every task with `--seed + i`, so two evaluations with the same `--seed` are compared as matched pairs.
@@ -458,7 +459,7 @@ With the `gymnasium` extra, `physim_gate.adapters.gymnasium.run_gymnasium(env_id
 | Third-party adapters via entry points | Supported |
 | Built-in adapters: `json`, `synthetic` (demo/tests) | Supported |
 | `gymnasium` adapter (optional extra, CPU classic-control environments tested) | Supported, tested with CartPole only |
-| `lerobot` adapter for `lerobot-eval` output | Supported, tested with real LeRobot 0.6.2 output on PushT; LIBERO and other multi-task suites only with constructed files |
+| `lerobot` adapter for `lerobot-eval` output | Supported, tested with real LeRobot 0.6.2 output on PushT and on four MetaWorld tasks; LIBERO not run (LeRobot installs it on Linux only) |
 | CARLA, ROS 2 bags, PX4 SITL, Isaac Sim adapters | **Not implemented** (see roadmap) |
 | Running simulators, scheduling jobs, scenario generation | Out of scope |
 | Dashboards, hosted service, accounts | Out of scope |
@@ -475,6 +476,6 @@ Later versions look at trajectory-level metrics.
 
 Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
 The architecture is described in [docs/architecture.md](docs/architecture.md).
-All example data in this repository is synthetic, except [`examples/lerobot-pusht/`](examples/lerobot-pusht), which is real LeRobot output from a public checkpoint.
+All example data in this repository is synthetic, except [`examples/lerobot-pusht/`](examples/lerobot-pusht) and [`examples/lerobot-metaworld/`](examples/lerobot-metaworld), which are real LeRobot output from public checkpoints.
 
 PhySim Gate is licensed under the [Apache License 2.0](LICENSE).

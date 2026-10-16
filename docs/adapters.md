@@ -93,8 +93,9 @@ The multi-task layout does not record seeds, so the adapter cannot check that bo
 | `policy` | Policy id to record, for example the Hugging Face repository of the checkpoint |
 | `scenario` | Scenario id; defaults to the task groups joined with `+` |
 
-Tested with real output of LeRobot 0.6.2 on PushT ([`examples/lerobot-pusht/`](../examples/lerobot-pusht)).
-The multi-group and single-task layouts are tested with files constructed from LeRobot's source, not with real LIBERO or MetaWorld output.
+Tested with real output of LeRobot 0.6.2 on PushT ([`examples/lerobot-pusht/`](../examples/lerobot-pusht)) and on four MetaWorld tasks ([`examples/lerobot-metaworld/`](../examples/lerobot-metaworld)), both in the multi-task layout.
+The single-task layout of LeRobot 0.3.x is tested with files constructed from LeRobot's source.
+LIBERO was not run: LeRobot installs it on Linux only.
 
 ## Example: CSV
 
