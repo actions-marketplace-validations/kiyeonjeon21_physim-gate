@@ -333,7 +333,7 @@ With the `gymnasium` extra, `physim_gate.adapters.gymnasium.run_gymnasium(env_id
 
 ## Supported and not supported
 
-| Capability | Status in v0.1.0 |
+| Capability | Status in v0.1.1 |
 |---|---|
 | Run-result schema 1.0 (JSON), JSON Schema export | Supported |
 | Baseline vs candidate comparison, paired and unpaired bootstrap | Supported |

@@ -23,7 +23,7 @@ jobs:
 
       - name: Install PhySim Gate
         # Not on PyPI yet: install from a pinned git revision of the repository.
-        run: python -m pip install "physim-gate @ git+https://github.com/kiyeonjeon21/physim-gate@v0.1.0"
+        run: python -m pip install "physim-gate @ git+https://github.com/kiyeonjeon21/physim-gate@v0.1.1"
 
       - name: Simulate the candidate
         # Replace with your own simulation job. It must write a run result

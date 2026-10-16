@@ -3,7 +3,9 @@
 This is a plan, not a promise.
 Priorities follow what makes the gate trustworthy and useful with real simulators first.
 
-## v0.1.0 (this release)
+## v0.1 (released)
+
+v0.1.1 fixed the findings of the [OSS readiness review](oss-readiness-review.md), most importantly score intervals for 0/1 metrics.
 
 - Run-result schema 1.0, comparison schema 1.0, JSON Schemas.
 - Comparison engine: absolute, relative and combined margins, mean or median, paired and unpaired percentile bootstrap, missing-data and zero-baseline rules, optional Bonferroni correction, conservative policy defaults.
