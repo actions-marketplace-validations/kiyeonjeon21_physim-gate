@@ -1,12 +1,12 @@
 [build-system]
-requires = ["hatchling>=1.27"]
+requires = ["hatchling>=1.27", "hatch-fancy-pypi-readme>=25.1"]
 build-backend = "hatchling.build"
 
 [project]
 name = "physim-gate"
 version = "0.1.1"
 description = "Test physical AI like software. Catch behavioral regressions in simulation results before deployment."
-readme = "README.md"
+dynamic = ["readme"]
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 requires-python = ">=3.11"
@@ -67,6 +67,22 @@ synthetic = "physim_gate.adapters.synthetic:SyntheticAdapter"
 gymnasium = "physim_gate.adapters.gymnasium:GymnasiumAdapter"
 lerobot = "physim_gate.adapters.lerobot:LeRobotAdapter"
 
+# PyPI cannot resolve repository-relative links, so the README published there points them at
+# GitHub: images at their raw files, everything else at its page on GitHub.
+[tool.hatch.metadata.hooks.fancy-pypi-readme]
+content-type = "text/markdown"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.fragments]]
+path = "README.md"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+pattern = '!\[([^\]]*)\]\((?!https?://)([^)]+)\)'
+replacement = '![\1](https://raw.githubusercontent.com/kiyeonjeon21/physim-gate/main/\2)'
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+pattern = '\]\((?!https?://|#)([^)]+)\)'
+replacement = '](https://github.com/kiyeonjeon21/physim-gate/blob/main/\1)'
+
 [tool.hatch.build.targets.sdist]
 include = [
   "/src",
@@ -76,6 +92,7 @@ include = [
   "/schemas",
   "/README.md",
   "/LICENSE",
+  "/action.yml",
   "/CHANGELOG.md",
   "/CONTRIBUTING.md",
 ]

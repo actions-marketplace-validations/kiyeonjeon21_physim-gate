@@ -1,0 +1,142 @@
+name: PhySim Gate
+description: Compare simulation results against a baseline and fail on behavioral regressions.
+author: Kiyeon Jeon
+branding:
+  icon: shield
+  color: blue
+
+inputs:
+  baseline:
+    description: Baseline run result (file or directory, depending on the adapter).
+    required: true
+  candidate:
+    description: Candidate run result.
+    required: true
+  config:
+    description: Gate config (gate.yaml).
+    required: true
+  adapter:
+    description: Adapter that reads the inputs, for example json, lerobot or gymnasium.
+    default: json
+  adapter-options:
+    description: Adapter options, one key=value per line.
+    default: ""
+  extras:
+    description: Optional dependencies to install, for example gymnasium.
+    default: ""
+  output-dir:
+    description: Directory for comparison.json, junit.xml, report.html and summary.md.
+    default: physim-gate-report
+  fail:
+    description: >-
+      Fail the step when the gate does not pass (exit code 1 or 3). Usage and internal
+      errors (exit codes 2 and 4) always fail the step.
+    default: "true"
+  comment:
+    description: >-
+      On pull requests, post the Markdown summary as a comment and update it on later runs.
+      Needs "pull-requests: write" permission.
+    default: "false"
+  setup-python:
+    description: Install Python with actions/setup-python first. Set to false to use the runner's.
+    default: "true"
+  python-version:
+    description: Python version used when setup-python is true.
+    default: "3.13"
+  github-token:
+    description: Token used to post the pull-request comment.
+    default: ${{ github.token }}
+
+outputs:
+  verdict:
+    description: PASS, FAIL, INCONCLUSIVE or INVALID.
+    value: ${{ steps.gate.outputs.verdict }}
+  exit-code:
+    description: The exit code of physim-gate compare.
+    value: ${{ steps.gate.outputs.exit-code }}
+  report-dir:
+    description: The directory with the reports.
+    value: ${{ steps.gate.outputs.report-dir }}
+
+runs:
+  using: composite
+  steps:
+    - if: inputs.setup-python == 'true'
+      uses: actions/setup-python@v7
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install physim-gate
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        EXTRAS: ${{ inputs.extras }}
+      run: |
+        target="$ACTION_PATH"
+        if [ -n "$EXTRAS" ]; then target="$ACTION_PATH[$EXTRAS]"; fi
+        python -m pip install --disable-pip-version-check --quiet "$target"
+        physim-gate --version
+
+    - name: Gate
+      id: gate
+      shell: bash
+      env:
+        BASELINE: ${{ inputs.baseline }}
+        CANDIDATE: ${{ inputs.candidate }}
+        CONFIG: ${{ inputs.config }}
+        ADAPTER: ${{ inputs.adapter }}
+        ADAPTER_OPTIONS: ${{ inputs.adapter-options }}
+        OUTPUT_DIR: ${{ inputs.output-dir }}
+      run: |
+        args=(compare --adapter "$ADAPTER" -b "$BASELINE" -c "$CANDIDATE" -g "$CONFIG"
+              --output "$OUTPUT_DIR/comparison.json" --junit "$OUTPUT_DIR/junit.xml"
+              --html "$OUTPUT_DIR/report.html" --markdown "$OUTPUT_DIR/summary.md")
+        while IFS= read -r option; do
+          option="${option#"${option%%[![:space:]]*}"}"
+          option="${option%"${option##*[![:space:]]}"}"
+          if [ -n "$option" ]; then args+=(-O "$option"); fi
+        done <<< "$ADAPTER_OPTIONS"
+
+        set +e
+        physim-gate "${args[@]}"
+        code=$?
+        set -e
+
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+        echo "report-dir=$OUTPUT_DIR" >> "$GITHUB_OUTPUT"
+        if [ -f "$OUTPUT_DIR/comparison.json" ]; then
+          verdict=$(python -c 'import json, sys; print(json.load(open(sys.argv[1]))["verdict"])' \
+            "$OUTPUT_DIR/comparison.json")
+          echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
+          cat "$OUTPUT_DIR/summary.md" >> "$GITHUB_STEP_SUMMARY"
+        fi
+
+    - name: Comment on the pull request
+      if: inputs.comment == 'true' && github.event_name == 'pull_request' && steps.gate.outputs.verdict != ''
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        REPOSITORY: ${{ github.repository }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        SUMMARY: ${{ steps.gate.outputs.report-dir }}/summary.md
+      run: |
+        marker="<!-- physim-gate -->"
+        existing=$(gh api --paginate "repos/$REPOSITORY/issues/$PR_NUMBER/comments" \
+          --jq "map(select(.body | startswith(\"$marker\"))) | .[0].id // empty" | head -n 1)
+        if [ -n "$existing" ]; then
+          gh api --method PATCH "repos/$REPOSITORY/issues/comments/$existing" -F "body=@$SUMMARY" > /dev/null
+        else
+          gh api --method POST "repos/$REPOSITORY/issues/$PR_NUMBER/comments" -F "body=@$SUMMARY" > /dev/null
+        fi
+
+    - name: Apply the verdict
+      shell: bash
+      env:
+        CODE: ${{ steps.gate.outputs.exit-code }}
+        FAIL: ${{ inputs.fail }}
+      run: |
+        case "$CODE" in
+          0) exit 0 ;;
+          1|3) if [ "$FAIL" = "true" ]; then exit "$CODE"; fi ;;
+          *) exit "$CODE" ;;
+        esac

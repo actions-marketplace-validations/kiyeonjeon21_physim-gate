@@ -36,7 +36,7 @@ Tests for optional integrations skip automatically when the integration is not i
 - **Do not claim support you have not tested.** A new adapter needs fixtures and tests that run in CI without the simulator installed.
 - **Schema changes are versioned.** Additive, optional fields bump the minor version. Anything else bumps the major version and needs a migration note. Regenerate `schemas/*.json` with `physim-gate schema run|comparison|config`; a test fails if they drift.
 - **Fixtures are generated.** Edit the YAML specs under `src/physim_gate/fixtures/` and regenerate `examples/highway-merge/*.json` (see `tests/test_examples.py`). Do not hand-edit generated JSON.
-- **Synthetic data only.** Do not add proprietary datasets, logs or code.
+- **No proprietary data.** Use synthetic data, or output you produced yourself from public simulators and checkpoints, with a README that says exactly how to reproduce it (see `examples/lerobot-pusht/`). Do not add proprietary datasets, logs or code.
 - **Keep dependencies small.** New runtime dependencies need a strong reason.
 
 ## Commit messages and the changelog
@@ -47,6 +47,16 @@ Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (`fe
 ```bash
 git cliff --tag v0.2.0 -o CHANGELOG.md
 ```
+
+## Releasing
+
+1. Bump the version in `pyproject.toml` and `src/physim_gate/__init__.py`, and the action tag in the README and `examples/github-actions/physim-gate.yml`.
+2. Generate the changelog with git-cliff (above) and commit it.
+3. Tag the commit `vX.Y.Z`, push the tag, and publish a GitHub release for it.
+4. Publishing the release runs `.github/workflows/release.yml`, which builds, checks and tests the distributions and uploads them to PyPI with [trusted publishing](https://docs.pypi.org/trusted-publishers/). No API token is involved.
+
+Trusted publishing has to be set up once on pypi.org: add a publisher for owner `kiyeonjeon21`, repository `physim-gate`, workflow `release.yml` and environment `pypi`.
+Running the workflow manually publishes to TestPyPI instead, which needs the same setup on test.pypi.org with environment `testpypi`.
 
 ## Reporting issues
 
