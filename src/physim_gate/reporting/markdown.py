@@ -27,7 +27,7 @@ _ICON = {
 }
 
 
-def _cell(text: str) -> str:
+def cell(text: str) -> str:
     """Escape what would break a table cell or start Markdown formatting."""
     return (
         text.replace("\\", "\\\\")
@@ -38,7 +38,12 @@ def _cell(text: str) -> str:
     )
 
 
-def _code(text: str) -> str:
+def sentence(text: str) -> str:
+    """Capitalize the first letter, for summaries that start lowercase in terminal output."""
+    return text[:1].upper() + text[1:]
+
+
+def code_span(text: str) -> str:
     """An inline code span. GitHub renders its content literally, except that a pipe still
     ends a table cell unless escaped."""
     quoted = text.replace("`", "'").replace("|", "\\|").replace("\n", " ")
@@ -56,9 +61,9 @@ def _metric_name(metric: MetricComparison) -> str:
     arrow = ""
     if metric.direction is not None:
         arrow = NBSP + ("↑" if metric.direction.value == "higher_is_better" else "↓")
-    unit = f" ({_cell(metric.unit)})" if metric.unit else ""
+    unit = f" ({cell(metric.unit)})" if metric.unit else ""
     optional = " optional" if not metric.required else ""
-    return f"{_code(metric.name)}{arrow}{unit}{optional}"
+    return f"{code_span(metric.name)}{arrow}{unit}{optional}"
 
 
 def _count(metric: MetricComparison) -> str:
@@ -90,12 +95,12 @@ def _run(label: str, run: RunSummary) -> str:
         parts.append(f"{run.n_trials_not_ok} not ok")
     if run.policy is not None:
         version = f"@{run.policy.version}" if run.policy.version else ""
-        parts.append(f"policy {_code(run.policy.id + version)}")
+        parts.append(f"policy {code_span(run.policy.id + version)}")
     if run.source.commit:
         parts.append(
-            f"commit {_code(run.source.commit[:12])}" + (" (dirty)" if run.source.dirty else "")
+            f"commit {code_span(run.source.commit[:12])}" + (" (dirty)" if run.source.dirty else "")
         )
-    return f"**{label}** {_code(run.run_id)}: " + ", ".join(parts)
+    return f"**{label}** {code_span(run.run_id)}: " + ", ".join(parts)
 
 
 def _simulator(run: RunSummary) -> str:
@@ -105,25 +110,27 @@ def _simulator(run: RunSummary) -> str:
 def _details(metrics: Iterable[MetricComparison]) -> list[str]:
     lines: list[str] = []
     for metric in metrics:
-        lines.append(f"**{_cell(metric.name)}**: {_verdict(metric)}")
+        lines.append(f"**{cell(metric.name)}**: {_verdict(metric)}")
         method = method_label(metric)
         if method is not None:
             lines.append(f"- method: {method}")
-        lines += [f"- {_cell(reason)}" for reason in metric.reasons]
+        lines += [f"- {cell(reason)}" for reason in metric.reasons]
         lines.append("")
     return lines
 
 
-def _render(result: ComparisonResult, *, reasons: bool, fold_passing: bool) -> str:
+def _render(
+    result: ComparisonResult, *, reasons: bool, fold_passing: bool, marker: bool, heading: str
+) -> str:
     sims = sorted({_simulator(result.baseline), _simulator(result.candidate)})
     lines = [
-        MARKER,
-        f"### {_ICON[result.verdict]} PhySim Gate: {result.verdict.value}",
+        *([MARKER] if marker else []),
+        f"{heading} {_ICON[result.verdict]} PhySim Gate: {result.verdict.value}",
         "",
-        _cell(result.summary[:1].upper() + result.summary[1:]),
+        cell(sentence(result.summary)),
         "",
-        f"Scenario {_code(result.candidate.scenario.id)} ({result.candidate.domain.value}), "
-        f"simulator {', '.join(_code(s) for s in sims)}.  ",
+        f"Scenario {code_span(result.candidate.scenario.id)} ({result.candidate.domain.value}), "
+        f"simulator {', '.join(code_span(s) for s in sims)}.  ",
         _run("Baseline", result.baseline) + "  ",
         _run("Candidate", result.candidate),
         "",
@@ -148,8 +155,8 @@ def _render(result: ComparisonResult, *, reasons: bool, fold_passing: bool) -> s
     )
     lines.append("")
 
-    issues = [f"- **blocking:** {_cell(i)}" for i in result.run_blocking_issues]
-    issues += [f"- {_cell(i)}" for i in result.run_issues]
+    issues = [f"- **blocking:** {cell(i)}" for i in result.run_blocking_issues]
+    issues += [f"- {cell(i)}" for i in result.run_issues]
     if issues:
         lines += ["**Run notes**", "", *issues, ""]
 
@@ -163,16 +170,27 @@ def _render(result: ComparisonResult, *, reasons: bool, fold_passing: bool) -> s
             "",
         ]
     if result.untracked_metrics:
-        lines += [f"Not gated: {', '.join(_code(m) for m in result.untracked_metrics)}", ""]
+        lines += [f"Not gated: {', '.join(code_span(m) for m in result.untracked_metrics)}", ""]
     lines.append(f"<sub>physim-gate {result.tool.version}, exit code {result.exit_code}</sub>")
     return "\n".join(lines) + "\n"
 
 
-def render_markdown(result: ComparisonResult, *, max_chars: int = MAX_CHARS) -> str:
-    """Render the comparison as Markdown no longer than ``max_chars`` where possible."""
-    text = _render(result, reasons=True, fold_passing=False)
-    if len(text) > max_chars:
-        text = _render(result, reasons=False, fold_passing=False)
-    if len(text) > max_chars:
-        text = _render(result, reasons=False, fold_passing=True)
+def render_markdown(
+    result: ComparisonResult,
+    *,
+    max_chars: int = MAX_CHARS,
+    marker: bool = True,
+    heading: str = "###",
+) -> str:
+    """Render the comparison as Markdown no longer than ``max_chars`` where possible.
+
+    ``marker`` adds the hidden comment that identifies the summary; ``heading`` is the Markdown
+    heading of the title (a suite nests scenario summaries one level deeper).
+    """
+    for reasons, fold_passing in ((True, False), (False, False), (False, True)):
+        text = _render(
+            result, reasons=reasons, fold_passing=fold_passing, marker=marker, heading=heading
+        )
+        if len(text) <= max_chars:
+            break
     return text

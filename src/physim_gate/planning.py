@@ -8,8 +8,11 @@ expect the true degradation to be, how many trials make the intended verdict lik
 * 0/1 metrics (success, collision, ...) are evaluated exactly. Every possible pair of event
   counts is weighted by its binomial probability and decided with the same unpaired Newcombe
   score interval the comparison engine uses, so the reported verdict probabilities are exact
-  for unpaired comparisons. Pairing, when the runs share trial conditions, usually needs fewer
-  trials, so the unpaired answer is a safe upper bound in the common case.
+  for unpaired comparisons.
+* Paired 0/1 metrics depend on how often the two runs disagree on the same condition (the
+  discordance). Their probabilities are simulated with the engine's paired Newcombe interval.
+* :func:`plan_from_comparison` takes everything from a pilot comparison: rates, discordance,
+  spreads, pairing, margins and the observed degradation.
 * Continuous metrics use the normal approximation
   ``n = ((z_conf + z_power) * sd_diff / |margin - degradation|) ** 2``. The engine uses a
   bootstrap, so this is an estimate, and it is least reliable for small n and skewed data.
@@ -18,13 +21,18 @@ expect the true degradation to be, how many trials make the intended verdict lik
 from __future__ import annotations
 
 import math
+import random
 import statistics
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
 
+from physim_gate.comparison import ComparisonResult, MetricComparison
 from physim_gate.schema import Direction
-from physim_gate.stats import newcombe_counts
+from physim_gate.stats import newcombe_counts, newcombe_paired_counts
+
+#: Simulated comparisons per candidate size for paired 0/1 metrics.
+PAIRED_SIMULATIONS = 4000
 
 #: Tail mass ignored when enumerating binomial outcomes.
 _TAIL = 1e-13
@@ -203,8 +211,14 @@ def plan_binary(
     power: float = 0.8,
     min_samples: int = 10,
     max_trials: int = 100_000,
+    discordance: float | None = None,
 ) -> Plan:
-    """Trials per run for a 0/1 metric with baseline ``rate`` (fraction of 1s)."""
+    """Trials per run for a 0/1 metric with baseline ``rate`` (fraction of 1s).
+
+    With ``discordance`` (the probability that baseline and candidate disagree on the same trial
+    condition) the runs are planned as paired, by simulation. Without it they are unpaired and
+    the probabilities are exact.
+    """
     _check_levels(confidence, power)
     if not 0 <= rate <= 1:
         raise PlanningError("rate must be between 0 and 1")
@@ -214,6 +228,11 @@ def plan_binary(
     if not 0 <= bad_cand <= 1:
         raise PlanningError(
             f"a true degradation of {true_degradation:g} from a rate of {rate:g} leaves [0, 1]"
+        )
+    if discordance is not None:
+        cells = PairCells.from_discordance(bad_base, discordance, true_degradation)
+        return _plan_paired_binary(
+            cells, margin, goal, true_degradation, confidence, power, min_samples, max_trials
         )
 
     cache: dict[int, VerdictProbabilities] = {}
@@ -279,7 +298,7 @@ def plan_continuous(
         probabilities = VerdictProbabilities(
             pass_=p_pass, fail=p_fail, inconclusive=max(0.0, 1.0 - p_pass - p_fail)
         )
-    notes = ["normal approximation; the engine's bootstrap may need somewhat more trials"]
+    notes = ["the engine's bootstrap may need somewhat more trials"]
     if trials is not None and trials < 30:
         notes.append("below 30 trials the bootstrap interval is too narrow, see the error rates")
     return Plan(
@@ -295,3 +314,269 @@ def plan_continuous(
         probabilities=probabilities,
         notes=notes,
     )
+
+
+@dataclass(frozen=True)
+class PairCells:
+    """Probabilities of the four outcomes of a pair, counting the *bad* event (degradation up).
+
+    ``both``: bad in baseline and candidate; ``base_only``: bad only in the baseline;
+    ``cand_only``: bad only in the candidate; ``neither``: bad in neither.
+    """
+
+    both: float
+    base_only: float
+    cand_only: float
+    neither: float
+
+    @property
+    def degradation(self) -> float:
+        return self.cand_only - self.base_only
+
+    @property
+    def discordance(self) -> float:
+        return self.base_only + self.cand_only
+
+    @classmethod
+    def from_discordance(cls, bad_base: float, discordance: float, degradation: float) -> PairCells:
+        if not 0 < discordance <= 1:
+            raise PlanningError("discordance must be in (0, 1]")
+        if abs(degradation) > discordance:
+            raise PlanningError(
+                f"a true degradation of {degradation:g} needs a discordance of at least "
+                f"{abs(degradation):g}: only pairs that disagree can move the rate"
+            )
+        base_only = (discordance - degradation) / 2
+        cand_only = (discordance + degradation) / 2
+        both = bad_base - base_only
+        neither = 1.0 - both - base_only - cand_only
+        if both < -1e-12 or neither < -1e-12:
+            raise PlanningError(
+                f"a discordance of {discordance:g} is impossible with a rate of "
+                f"{bad_base:g} and a degradation of {degradation:g}"
+            )
+        return cls(max(both, 0.0), base_only, cand_only, max(neither, 0.0))
+
+    def with_degradation(self, degradation: float) -> PairCells:
+        """The same rate and discordance, with the disagreements split to give ``degradation``."""
+        return PairCells.from_discordance(self.both + self.base_only, self.discordance, degradation)
+
+
+def _binomial(rng: random.Random, n: int, p: float) -> int:
+    """A Binomial(n, p) draw by counting geometric waiting times, O(n * min(p, 1 - p))."""
+    if p <= 0 or n <= 0:
+        return 0
+    if p >= 1:
+        return n
+    if p > 0.5:
+        return n - _binomial(rng, n, 1 - p)
+    log_q = math.log1p(-p)
+    count = position = 0
+    while True:
+        position += int(math.log(1.0 - rng.random()) / log_q) + 1
+        if position > n:
+            return count
+        count += 1
+
+
+def paired_binary_verdict_probabilities(
+    trials: int,
+    cells: PairCells,
+    margin: float,
+    confidence: float,
+    *,
+    simulations: int = PAIRED_SIMULATIONS,
+    seed: str = "physim-gate-plan",
+) -> VerdictProbabilities:
+    """Simulated verdict probabilities for a paired 0/1 metric (bad events, lower is better)."""
+    rng = random.Random(f"{seed}:{trials}")
+    p_pass = p_fail = 0
+    for _ in range(simulations):
+        remaining = trials
+        base_only = _binomial(rng, remaining, cells.base_only)
+        remaining -= base_only
+        rest = 1.0 - cells.base_only
+        cand_only = _binomial(rng, remaining, cells.cand_only / rest if rest > 0 else 0.0)
+        remaining -= cand_only
+        rest -= cells.cand_only
+        both = _binomial(rng, remaining, cells.both / rest if rest > 0 else 0.0)
+        neither = remaining - both
+        low, high = newcombe_paired_counts(
+            both, base_only, cand_only, neither, confidence=confidence
+        )
+        if high <= margin:
+            p_pass += 1
+        elif low > margin:
+            p_fail += 1
+    return VerdictProbabilities(
+        pass_=p_pass / simulations,
+        fail=p_fail / simulations,
+        inconclusive=(simulations - p_pass - p_fail) / simulations,
+    )
+
+
+def _independent_discordance(cells: PairCells) -> float:
+    base, cand = cells.both + cells.base_only, cells.both + cells.cand_only
+    return base * (1 - cand) + cand * (1 - base)
+
+
+def _plan_paired_binary(
+    cells: PairCells,
+    margin: float,
+    goal: Goal,
+    true_degradation: float,
+    confidence: float,
+    power: float,
+    min_samples: int,
+    max_trials: int,
+) -> Plan:
+    cache: dict[int, VerdictProbabilities] = {}
+
+    def probabilities(n: int) -> VerdictProbabilities:
+        if n not in cache:
+            cache[n] = paired_binary_verdict_probabilities(n, cells, margin, confidence)
+        return cache[n]
+
+    trials = _smallest_n(lambda n: probabilities(n).of(goal), power, min_samples, max_trials)
+    se = math.sqrt(power * (1 - power) / PAIRED_SIMULATIONS)
+    return Plan(
+        kind="binary",
+        method=f"simulated, {PAIRED_SIMULATIONS:,} runs per size (paired Newcombe interval)",
+        goal=goal,
+        margin=margin,
+        true_degradation=true_degradation,
+        confidence=confidence,
+        power=power,
+        trials=trials,
+        max_trials=max_trials,
+        probabilities=probabilities(trials) if trials is not None else None,
+        notes=[
+            f"discordance {cells.discordance:.3g}: the share of pairs whose outcomes differ "
+            f"(independent runs would give {_independent_discordance(cells):.3g}; less means "
+            "pairing helps)",
+            f"simulated probabilities are accurate to about +/- {se * 100:.1f} points",
+        ],
+    )
+
+
+@dataclass(frozen=True)
+class MetricPlan:
+    """The plan for one metric of a pilot comparison, or why there is none."""
+
+    metric: str
+    plan: Plan | None
+    reason: str | None = None
+
+
+def plan_from_comparison(
+    result: ComparisonResult,
+    *,
+    metrics: list[str] | None = None,
+    true_degradation: float | None = None,
+    power: float = 0.8,
+    max_trials: int = 100_000,
+) -> list[MetricPlan]:
+    """Plan each gated metric of a pilot comparison from its own data.
+
+    The observed degradation is the assumed true degradation unless ``true_degradation`` is
+    given. Rates, spreads, pairing, discordance, margins and confidence come from the pilot.
+    A relative margin is used at its pilot value.
+    """
+    known = {m.name for m in result.metrics}
+    unknown = sorted(set(metrics or []) - known)
+    if unknown:
+        raise PlanningError(
+            f"no metric {', '.join(unknown)} in the comparison; it has {', '.join(sorted(known))}"
+        )
+    plans = []
+    for metric in result.metrics:
+        if metrics and metric.name not in metrics:
+            continue
+        try:
+            plans.append(
+                MetricPlan(metric.name, _plan_metric(metric, true_degradation, power, max_trials))
+            )
+        except PlanningError as exc:
+            plans.append(MetricPlan(metric.name, None, str(exc)))
+    return plans
+
+
+def _plan_metric(
+    metric: MetricComparison, true_degradation: float | None, power: float, max_trials: int
+) -> Plan:
+    n, base, cand = metric.numerical, metric.baseline, metric.candidate
+    if n is None or base is None or cand is None or metric.direction is None:
+        raise PlanningError(f"{metric.verdict.value}: the pilot has no usable values")
+    degradation = n.degradation if true_degradation is None else true_degradation
+    confidence = metric.evidence.adjusted_confidence or 0.95
+    paired = metric.pairing is not None and metric.pairing.mode == "paired"
+    method = metric.evidence.method or ""
+    lower = metric.direction is Direction.LOWER_IS_BETTER
+
+    if method.endswith("newcombe"):
+        if not paired:
+            return plan_binary(
+                base.mean or 0.0,
+                n.margin,
+                direction=metric.direction,
+                true_degradation=degradation,
+                confidence=confidence,
+                power=power,
+                min_samples=metric.min_samples,
+                max_trials=max_trials,
+            )
+        bad = [
+            (b if lower else 1.0 - b, c if lower else 1.0 - c)
+            for b, c in zip(base.values, cand.values, strict=True)
+        ]
+        size = len(bad)
+        cells = PairCells(
+            both=sum(1 for b, c in bad if b and c) / size,
+            base_only=sum(1 for b, c in bad if b and not c) / size,
+            cand_only=sum(1 for b, c in bad if c and not b) / size,
+            neither=sum(1 for b, c in bad if not b and not c) / size,
+        )
+        if cells.discordance == 0:
+            raise PlanningError(
+                "every pair agreed in the pilot, so the paired interval cannot be planned from it; "
+                "use 'plan --rate ... --discordance ...' with an assumed discordance"
+            )
+        if true_degradation is not None:
+            cells = cells.with_degradation(true_degradation)
+        _check_levels(confidence, power)
+        goal = _goal(n.margin, cells.degradation)
+        return _plan_paired_binary(
+            cells,
+            n.margin,
+            goal,
+            cells.degradation,
+            confidence,
+            power,
+            metric.min_samples,
+            max_trials,
+        )
+
+    if paired:
+        differences = [c - b for b, c in zip(base.values, cand.values, strict=True)]
+        spread = statistics.stdev(differences) if len(differences) > 1 else 0.0
+    else:
+        spread = (
+            math.sqrt((statistics.variance(base.values) + statistics.variance(cand.values)) / 2)
+            if len(base.values) > 1 and len(cand.values) > 1
+            else 0.0
+        )
+    if spread == 0:
+        raise PlanningError("the pilot values do not vary, so their spread cannot be estimated")
+    plan = plan_continuous(
+        spread,
+        n.margin,
+        paired=paired,
+        true_degradation=degradation,
+        confidence=confidence,
+        power=power,
+        min_samples=metric.min_samples,
+        max_trials=max_trials,
+    )
+    if metric.statistic.value == "median":
+        plan.notes.append("the plan assumes the mean; medians usually need more trials")
+    return plan

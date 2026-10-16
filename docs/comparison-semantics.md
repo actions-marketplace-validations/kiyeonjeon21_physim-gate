@@ -223,8 +223,17 @@ The interval's bounds rise with the candidate's count and fall with the baseline
 Tests compare the result with brute-force enumeration (agreement within 1e-12) and with the engine itself on simulated runs.
 The Monte Carlo study above found `FAIL` in 11.4% of runs for "collision 0.01 to 0.06, unpaired, 80 trials"; the exact probability is 11.1%.
 
-Runs that share trial conditions are compared as pairs, which usually narrows the interval, so for paired runs the unpaired answer is normally an upper bound.
 Power for 0/1 data rises unevenly with the number of trials, so a few trials more than the reported number add a little safety.
+
+For paired 0/1 runs (`--discordance D`), the interval depends on all four cells of the 2x2 table of pairs, so the planner simulates instead: for each candidate size it draws 4,000 tables from the cell probabilities and decides each with the engine's paired Newcombe interval.
+The cell probabilities follow from the baseline rate, the discordance `D` (the share of pairs whose outcomes differ) and the assumed degradation: of the discordant pairs, `(D + d) / 2` are bad only in the candidate and `(D - d) / 2` only in the baseline.
+A test checks the simulation against the engine on simulated runs.
+Pairing helps when the runs disagree less often than independent runs would (`2p(1-p)` for a rate `p`).
+For a 90% success rate and a 5-point margin, 4% discordance needs 173 trials per run, 8% needs 284, and 20%, which is more than independent runs' 18%, needs 641 compared with 573 unpaired.
+
+`--from comparison.json` plans every gated metric of a pilot comparison from its own data: the baseline rate or the spread (of the paired differences when paired), the discordance of paired 0/1 metrics, the margin as evaluated in the pilot (relative margins at their pilot value), the confidence after any correction, and `min_samples`.
+The assumed true degradation is the pilot's observed one unless `--true-degradation` is given.
+Metrics the pilot could not evaluate, and paired 0/1 metrics whose pilot pairs all agreed, are listed with the reason.
 
 For continuous metrics (`--stdev`), the planner uses the normal approximation
 

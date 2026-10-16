@@ -4,21 +4,28 @@ import itertools
 import json
 import random
 from math import comb
+from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
+from physim_gate.adapters.base import get_adapter
 from physim_gate.cli import app
-from physim_gate.config import GateConfig
+from physim_gate.comparison import ComparisonResult
+from physim_gate.config import GateConfig, load_config
 from physim_gate.engine import compare_runs
 from physim_gate.planning import (
     Goal,
+    PairCells,
     PlanningError,
+    _binomial,
     binary_verdict_probabilities,
+    paired_binary_verdict_probabilities,
     plan_binary,
     plan_continuous,
+    plan_from_comparison,
 )
-from physim_gate.schema import Direction
+from physim_gate.schema import Direction, dump_json
 from physim_gate.stats import newcombe_counts
 from tests.conftest import make_run
 
@@ -158,9 +165,167 @@ def test_plan_cli() -> None:
     for args, message in [
         (["plan", "-m", "0.1"], "exactly one of --rate"),
         (["plan", "-m", "0.1", "-r", "0.5", "-s", "1"], "exactly one of --rate"),
-        (["plan", "-m", "0.1", "-r", "0.5", "--paired"], "--paired applies to --stdev"),
         (["plan", "-m", "0.1", "-r", "0.5", "-t", "0.1"], "equals the margin"),
     ]:
         result = runner.invoke(app, args)
         assert result.exit_code == 2
         assert message in result.output
+
+
+# Paired 0/1 planning and planning from a pilot comparison.
+
+PUSHT = Path(__file__).parent.parent / "examples" / "lerobot-pusht"
+
+
+def test_binomial_sampler_has_the_right_mean_and_variance() -> None:
+    rng = random.Random(1)
+    for n, p in [(50, 0.02), (400, 0.3), (400, 0.85), (10, 0.0), (10, 1.0)]:
+        draws = [_binomial(rng, n, p) for _ in range(4000)]
+        mean = sum(draws) / len(draws)
+        variance = sum((d - mean) ** 2 for d in draws) / len(draws)
+        assert mean == pytest.approx(n * p, abs=0.05 * n * max(p, 1 - p) ** 0.5 + 1e-9)
+        assert variance == pytest.approx(n * p * (1 - p), rel=0.1, abs=1e-9)
+
+
+def test_pair_cells() -> None:
+    cells = PairCells.from_discordance(0.1, 0.08, 0.02)
+    assert (cells.base_only, cells.cand_only) == pytest.approx((0.03, 0.05))
+    assert cells.both == pytest.approx(0.07)
+    assert cells.degradation == pytest.approx(0.02)
+    assert cells.with_degradation(0.0).degradation == pytest.approx(0.0)
+    with pytest.raises(PlanningError, match=r"needs a discordance of at least 0\.1"):
+        PairCells.from_discordance(0.1, 0.05, 0.1)
+    with pytest.raises(PlanningError, match="impossible"):
+        PairCells.from_discordance(0.01, 0.2, 0.0)
+    with pytest.raises(PlanningError, match=r"discordance must be in \(0, 1\]"):
+        PairCells.from_discordance(0.1, 0.0, 0.0)
+
+
+def test_paired_simulation_matches_the_engine() -> None:
+    """At a fixed size, the paired simulation and the real engine PASS about equally often."""
+    cells = PairCells.from_discordance(0.1, 0.08, 0.0)
+    n = 150
+    predicted = paired_binary_verdict_probabilities(n, cells, 0.05, 0.95)
+    config = GateConfig.model_validate(
+        {"version": 1, "metrics": {"success": {"max_absolute_degradation": 0.05}}}
+    )
+    rng = random.Random(5)
+    reps, passes = 600, 0
+    thresholds = (cells.both, cells.both + cells.base_only, 1 - cells.neither)
+    for _ in range(reps):
+        base, cand = [], []
+        for _ in range(n):
+            u = rng.random()
+            bad_b, bad_c = (
+                (1, 1) if u < thresholds[0]
+                else (1, 0) if u < thresholds[1]
+                else (0, 1) if u < thresholds[2]
+                else (0, 0)
+            )  # fmt: skip
+            base.append(1.0 - bad_b)
+            cand.append(1.0 - bad_c)
+        runs = [
+            make_run({"success": values}, run_id=name, directions={"success": "higher_is_better"})
+            for name, values in (("b", base), ("c", cand))
+        ]
+        passes += compare_runs(runs[0], runs[1], config).metrics[0].verdict.value == "PASS"
+    # Standard errors: about 0.02 for the engine estimate, 0.008 for the simulation.
+    assert passes / reps == pytest.approx(predicted.pass_, abs=0.07)
+
+
+def test_pairing_reduces_trials_when_runs_agree() -> None:
+    unpaired = plan_binary(0.9, 0.05)
+    paired = plan_binary(0.9, 0.05, discordance=0.04)
+    anti = plan_binary(0.9, 0.05, discordance=0.2)
+    assert paired.trials is not None
+    assert unpaired.trials is not None
+    assert anti.trials is not None
+    assert paired.trials < unpaired.trials / 2
+    # More disagreement than independent runs (2 * 0.1 * 0.9 = 0.18) means negative correlation.
+    assert anti.trials > unpaired.trials
+    assert "independent runs would give 0.18" in " ".join(paired.notes)
+
+
+def _pusht_comparison() -> ComparisonResult:
+    adapter = get_adapter("lerobot")
+    options = {"start_seed": "1000"}
+    return compare_runs(
+        adapter.load(PUSHT / "baseline", options),
+        adapter.load(PUSHT / "candidate-n-action-steps-8", options),
+        load_config(PUSHT / "gate.yaml"),
+    )
+
+
+def test_plan_from_a_pilot_comparison() -> None:
+    comparison = _pusht_comparison()
+    plans = {item.metric: item for item in plan_from_comparison(comparison)}
+    success = plans["success"].plan
+    assert success is not None
+    assert success.goal is Goal.FAIL
+    assert success.true_degradation == pytest.approx(0.10)
+    assert success.method.startswith("simulated")
+    assert success.trials is not None
+    assert 250 < success.trials < 400
+    max_reward = plans["max_reward"].plan
+    assert max_reward is not None
+    assert max_reward.method == "normal approximation (paired)"
+    assert max_reward.trials is not None
+    assert max_reward.trials < success.trials
+
+    only = plan_from_comparison(comparison, metrics=["success"], true_degradation=0.03)
+    assert [item.metric for item in only] == ["success"]
+    assert only[0].plan is not None
+    assert only[0].plan.goal is Goal.PASS
+    with pytest.raises(PlanningError, match="no metric nope"):
+        plan_from_comparison(comparison, metrics=["nope"])
+
+
+def test_plan_from_pilot_explains_unplannable_metrics() -> None:
+    values = [1.0] * 20
+    base = make_run({"ok": values, "gone": values, "flat": [2.0] * 20}, run_id="b")
+    cand = make_run({"ok": values, "gone": [None] * 20, "flat": [2.0] * 20}, run_id="c")
+    config = GateConfig.model_validate(
+        {
+            "version": 1,
+            "metrics": {
+                "ok": {"max_absolute_degradation": 0.05},
+                "gone": {"max_absolute_degradation": 0.05},
+                "flat": {"max_absolute_degradation": 0.05},
+            },
+        }
+    )
+    plans = {i.metric: i for i in plan_from_comparison(compare_runs(base, cand, config))}
+    assert plans["ok"].reason is not None
+    assert "every pair agreed" in plans["ok"].reason
+    assert plans["gone"].reason == "INVALID: the pilot has no usable values"
+    assert plans["flat"].reason is not None
+    assert "do not vary" in plans["flat"].reason
+
+
+def test_plan_cli_with_pilot_and_pairing(tmp_path: Path) -> None:
+    runner = CliRunner()
+    pilot = tmp_path / "comparison.json"
+    pilot.write_text(dump_json(_pusht_comparison()))
+    result = runner.invoke(app, ["plan", "--from", str(pilot)])
+    assert result.exit_code == 0, result.output
+    assert "success" in result.output
+    assert "trials per run" in result.output
+    as_json = json.loads(runner.invoke(app, ["plan", "--from", str(pilot), "-f", "json"]).stdout)
+    assert [item["metric"] for item in as_json] == ["success", "max_reward", "sum_reward"]
+    assert as_json[0]["plan"]["goal"] == "fail"
+
+    paired = runner.invoke(app, ["plan", "-r", "0.9", "-m", "0.05", "--discordance", "0.04"])
+    assert paired.exit_code == 0, paired.output
+    assert "simulated" in paired.output
+
+    for args, message in [
+        (["plan", "--from", str(pilot), "-m", "0.1"], "--margin cannot be combined with --from"),
+        (["plan", "-r", "0.9", "-m", "0.05", "--metric", "x"], "--metric applies to --from"),
+        (["plan", "-r", "0.9"], "give --margin"),
+        (["plan", "-r", "0.9", "-m", "0.05", "--paired"], "paired 0/1 runs need --discordance"),
+        (["plan", "-s", "1", "-m", "0.5", "--discordance", "0.1"], "--discordance applies to"),
+        (["plan", "--from", str(tmp_path / "missing.json")], "cannot read file"),
+    ]:
+        result = runner.invoke(app, args)
+        assert result.exit_code == 2, (args, result.output)
+        assert message in result.output, (args, result.output)

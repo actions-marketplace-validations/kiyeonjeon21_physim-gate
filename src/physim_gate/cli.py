@@ -16,6 +16,7 @@ from typing import Annotated, Any, NoReturn
 import typer
 import yaml
 from rich.markup import escape
+from rich.table import Table
 from rich.text import Text
 
 from physim_gate import __version__
@@ -30,7 +31,14 @@ from physim_gate.comparison import (
 )
 from physim_gate.config import GateConfig, load_config
 from physim_gate.engine import compare_runs
-from physim_gate.planning import Plan, PlanningError, plan_binary, plan_continuous
+from physim_gate.planning import (
+    MetricPlan,
+    Plan,
+    PlanningError,
+    plan_binary,
+    plan_continuous,
+    plan_from_comparison,
+)
 from physim_gate.provenance import sha256_path
 from physim_gate.reporting.html import render_html
 from physim_gate.reporting.junit import render_junit
@@ -43,6 +51,24 @@ from physim_gate.schema import (
     RunResult,
     SchemaError,
     dump_json,
+)
+from physim_gate.store import (
+    DEFAULT_STORE,
+    STORE_ENV,
+    is_reference,
+    list_baselines,
+    load_baseline,
+    reference_name,
+    save_baseline,
+)
+from physim_gate.suite import (
+    ResolvedScenario,
+    SuiteResult,
+    load_suite,
+    render_suite_junit,
+    render_suite_markdown,
+    run_suite,
+    suite_document,
 )
 from physim_gate.validation import lint_run
 
@@ -148,9 +174,47 @@ MarkdownOpt = Annotated[
 ]
 
 
+StoreOpt = Annotated[
+    Path | None,
+    typer.Option(
+        "--store",
+        help=f"Baseline store directory. Default: ${STORE_ENV} or {DEFAULT_STORE}.",
+        show_default=False,
+    ),
+]
+
+
+def _run_comparison(
+    baseline: Path,
+    candidate: Path,
+    config: Path,
+    adapter: str,
+    options: dict[str, str],
+    store: Path | None,
+) -> ComparisonResult:
+    """Load both runs (the baseline possibly from the store) and compare them."""
+    gate = load_config(config)
+    cand_run = _load(adapter, candidate, options)
+    if is_reference(str(baseline)):
+        baseline_file, base_run = load_baseline(
+            cand_run.scenario.id, reference_name(str(baseline)), store
+        )
+        baseline_ref = InputRef(path=str(baseline_file), sha256=sha256_path(baseline_file))
+    else:
+        base_run = _load(adapter, baseline, options)
+        baseline_ref = InputRef(path=str(baseline), sha256=sha256_path(baseline))
+    inputs = Inputs(
+        baseline=baseline_ref,
+        candidate=InputRef(path=str(candidate), sha256=sha256_path(candidate)),
+        config=InputRef(path=str(config), sha256=sha256_path(config)),
+        adapter=adapter,
+    )
+    return compare_runs(base_run, cand_run, gate, inputs=inputs)
+
+
 def _load(adapter_name: str, path: Path, options: dict[str, str]) -> RunResult:
     if not path.exists():
-        _fail(f"{path}: no such file")
+        raise InputError(f"{path}: no such file")
     return get_adapter(adapter_name).load(path, options)
 
 
@@ -179,20 +243,16 @@ def compare(
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Explain passing metrics too.")
     ] = False,
+    store: StoreOpt = None,
 ) -> None:
-    """Compare a candidate run against a baseline and gate on regressions."""
+    """Compare a candidate run against a baseline and gate on regressions.
+
+    --baseline @NAME uses the stored baseline NAME of the candidate's scenario
+    (see 'physim-gate baseline').
+    """
     with _guard():
         options = parse_options(adapter_option or [])
-        gate = load_config(config)
-        base_run = _load(adapter, baseline, options)
-        cand_run = _load(adapter, candidate, options)
-        inputs = Inputs(
-            baseline=InputRef(path=str(baseline), sha256=sha256_path(baseline)),
-            candidate=InputRef(path=str(candidate), sha256=sha256_path(candidate)),
-            config=InputRef(path=str(config), sha256=sha256_path(config)),
-            adapter=adapter,
-        )
-        result = compare_runs(base_run, cand_run, gate, inputs=inputs)
+        result = _run_comparison(baseline, candidate, config, adapter, options, store)
         _emit(
             result,
             output=output,
@@ -470,17 +530,84 @@ def _print_plan(plan: Plan, rate: float | None, direction: Direction) -> None:
         out.print(line)
     out.print()
     for note in plan.notes:
-        out.print(Text(f"  note: {note}", style="dim"))
+        out.print(Text(f"  note: {note}", style="dim"), soft_wrap=True)
+
+
+def _plan_document(result: Plan) -> dict[str, Any]:
+    document = dataclasses.asdict(result)
+    if result.probabilities is not None:
+        document["probabilities"] = {
+            "pass": result.probabilities.pass_,
+            "inconclusive": result.probabilities.inconclusive,
+            "fail": result.probabilities.fail,
+        }
+    return document
+
+
+def _print_pilot_plans(source: Path, comparison: ComparisonResult, plans: list[MetricPlan]) -> None:
+    out.print(
+        Text(f"plan from {source}", style="bold")
+        + Text(
+            f"  pilot: {comparison.baseline.n_trials} baseline and "
+            f"{comparison.candidate.n_trials} candidate trials",
+            style="dim",
+        ),
+        soft_wrap=True,
+    )
+    table = Table(show_edge=False, pad_edge=False, header_style="bold")
+    for column in ("metric", "pilot n", "degradation", "margin", "goal", "trials per run"):
+        table.add_column(column, justify="left" if column in ("metric", "goal") else "right")
+    table.add_column("P(goal)", justify="right")
+    notes: list[str] = []
+    by_name = {m.name: m for m in comparison.metrics}
+    for item in plans:
+        metric = by_name[item.metric]
+        if item.plan is None:
+            table.add_row(item.metric, "-", "-", "-", Text("-", style="dim"), "-", "-")
+            notes.append(f"{item.metric}: {item.reason}")
+            continue
+        plan = item.plan
+        count = "-"
+        if metric.pairing is not None and metric.pairing.mode == "paired":
+            count = f"{metric.pairing.n_pairs} pairs"
+        elif metric.baseline is not None and metric.candidate is not None:
+            count = f"{metric.baseline.n}/{metric.candidate.n}"
+        goal_verdict = Verdict.PASS if plan.goal.value == "pass" else Verdict.FAIL
+        table.add_row(
+            item.metric,
+            count,
+            f"{plan.true_degradation:+.4g}",
+            f"{plan.margin:.4g}",
+            Text(goal_verdict.value, style=VERDICT_STYLE[goal_verdict]),
+            Text(
+                f"{plan.trials:,}" if plan.trials is not None else f">{plan.max_trials:,}",
+                style="bold",
+            ),
+            _percent(plan.probabilities.of(plan.goal)) if plan.probabilities else "-",
+        )
+        notes.append(f"{item.metric}: {'; '.join([plan.method, *plan.notes])}")
+    out.print(table)
+    out.print(
+        Text(
+            "degradation = assumed true degradation (the pilot's observed value unless "
+            "--true-degradation is given); goal = the verdict that degradation should get",
+            style="dim",
+        )
+    )
+    if notes:
+        out.print()
+        for note in notes:
+            out.print(Text(f"  {note}", style="dim"), soft_wrap=True)
 
 
 @app.command(epilog=EXIT_CODES_HELP)
 def plan(
     margin: Annotated[
-        float,
+        float | None,
         typer.Option(
             "--margin", "-m", help="Allowed degradation, in the metric's unit (absolute)."
         ),
-    ],
+    ] = None,
     rate: Annotated[
         float | None,
         typer.Option("--rate", "-r", help="0/1 metric: expected baseline rate of 1s (0-1)."),
@@ -494,6 +621,17 @@ def plan(
             "(of the paired differences with --paired).",
         ),
     ] = None,
+    pilot: Annotated[
+        Path | None,
+        typer.Option(
+            "--from",
+            help="Plan every gated metric of a pilot comparison (comparison.json) from its data.",
+        ),
+    ] = None,
+    metric: Annotated[
+        list[str] | None,
+        typer.Option("--metric", help="With --from: only this metric. Repeatable."),
+    ] = None,
     direction: Annotated[
         Direction,
         typer.Option(
@@ -505,17 +643,25 @@ def plan(
         ),
     ] = Direction.HIGHER_IS_BETTER,
     true_degradation: Annotated[
-        float,
+        float | None,
         typer.Option(
             "--true-degradation",
             "-t",
             help="Degradation you expect the candidate to really have. Below the margin the "
-            "goal is PASS, above it FAIL.",
+            "goal is PASS, above it FAIL. Default: 0, or the pilot's observed degradation.",
         ),
-    ] = 0.0,
+    ] = None,
     paired: Annotated[
         bool, typer.Option("--paired", help="Continuous metric: runs share trial conditions.")
     ] = False,
+    discordance: Annotated[
+        float | None,
+        typer.Option(
+            "--discordance",
+            help="0/1 metric, paired runs: share of trial conditions on which baseline and "
+            "candidate disagree. Independent runs with rate p disagree on 2p(1-p).",
+        ),
+    ] = None,
     confidence: Annotated[float, typer.Option("--confidence", help="Interval level.")] = 0.95,
     power: Annotated[
         float, typer.Option("--power", help="Wanted probability of the goal verdict.")
@@ -524,28 +670,81 @@ def plan(
     output_format: FormatOpt = OutputFormat.TEXT,
 ) -> None:
     """Estimate how many trials per run a metric needs to reach a verdict."""
+    if pilot is not None:
+        conflicting = [
+            flag
+            for flag, value in (
+                ("--margin", margin),
+                ("--rate", rate),
+                ("--stdev", stdev),
+                ("--discordance", discordance),
+            )
+            if value is not None
+        ] + (["--paired"] if paired else [])
+        if conflicting:
+            _fail(
+                f"{', '.join(conflicting)} cannot be combined with --from; the pilot "
+                "comparison provides them"
+            )
+        with _guard():
+            comparison = load_comparison(pilot)
+            try:
+                plans = plan_from_comparison(
+                    comparison, metrics=metric, true_degradation=true_degradation, power=power
+                )
+            except PlanningError as exc:
+                _fail(str(exc))
+        if output_format is OutputFormat.JSON:
+            typer.echo(
+                json.dumps(
+                    [
+                        {
+                            "metric": item.metric,
+                            "plan": _plan_document(item.plan) if item.plan else None,
+                            "reason": item.reason,
+                        }
+                        for item in plans
+                    ],
+                    indent=2,
+                )
+            )
+            return
+        _print_pilot_plans(pilot, comparison, plans)
+        return
+
+    if metric:
+        _fail("--metric applies to --from only")
+    if margin is None:
+        _fail("give --margin (or plan from a pilot comparison with --from)")
     if (rate is None) == (stdev is None):
         _fail("give exactly one of --rate (0/1 metric) or --stdev (continuous metric)")
+    degradation = 0.0 if true_degradation is None else true_degradation
     try:
         if rate is not None:
-            if paired:
-                _fail("--paired applies to --stdev only; the 0/1 plan is exact for unpaired runs")
+            if paired and discordance is None:
+                _fail(
+                    "paired 0/1 runs need --discordance, the share of trial conditions on "
+                    "which the runs disagree"
+                )
             result = plan_binary(
                 rate,
                 margin,
                 direction=direction,
-                true_degradation=true_degradation,
+                true_degradation=degradation,
                 confidence=confidence,
                 power=power,
                 min_samples=min_samples,
+                discordance=discordance,
             )
         else:
             assert stdev is not None
+            if discordance is not None:
+                _fail("--discordance applies to 0/1 metrics (--rate) only")
             result = plan_continuous(
                 stdev,
                 margin,
                 paired=paired,
-                true_degradation=true_degradation,
+                true_degradation=degradation,
                 confidence=confidence,
                 power=power,
                 min_samples=min_samples,
@@ -553,14 +752,7 @@ def plan(
     except PlanningError as exc:
         _fail(str(exc))
     if output_format is OutputFormat.JSON:
-        document = dataclasses.asdict(result)
-        if result.probabilities is not None:
-            document["probabilities"] = {
-                "pass": result.probabilities.pass_,
-                "inconclusive": result.probabilities.inconclusive,
-                "fail": result.probabilities.fail,
-            }
-        typer.echo(json.dumps(document, indent=2))
+        typer.echo(json.dumps(_plan_document(result), indent=2))
         return
     _print_plan(result, rate, direction)
 
@@ -613,6 +805,181 @@ def demo(
     )
     if not all(o.as_expected for o in outcomes):
         _fail("a demo scenario produced an unexpected verdict", ExitCode.INTERNAL)
+
+
+@app.command(epilog=EXIT_CODES_HELP)
+def suite(
+    suite_file: Annotated[Path, typer.Argument(help="Suite file (suite.yaml).")],
+    output_dir: Annotated[
+        Path,
+        typer.Option(
+            "--output-dir", "-o", help="Reports: one directory per scenario, plus suite-wide files."
+        ),
+    ] = Path("physim-gate-suite"),
+    output_format: ReportFormatOpt = ReportFormat.TEXT,
+    store: StoreOpt = None,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show every scenario's full table.")
+    ] = False,
+) -> None:
+    """Gate several scenarios at once, with one aggregated verdict and exit code.
+
+    Writes comparison.json, junit.xml, report.html and summary.md per scenario under
+    OUTPUT_DIR/<scenario>/, and suite.json, junit.xml (one test suite per scenario) and
+    summary.md for the whole suite. Exit code: 2 if any scenario could not be compared, else 1
+    if any regressed, else 3 if any is blocked, else 0.
+    """
+    with _guard():
+        scenarios = load_suite(suite_file)
+
+        def compare_scenario(scenario: ResolvedScenario) -> ComparisonResult:
+            return _run_comparison(
+                scenario.baseline,
+                scenario.candidate,
+                scenario.config,
+                scenario.adapter,
+                scenario.adapter_options,
+                store,
+            )
+
+        result = run_suite(scenarios, compare_scenario)
+        for outcome in result.scenarios:
+            if outcome.result is None:
+                continue
+            directory = output_dir / outcome.name
+            _write(directory / "comparison.json", dump_json(outcome.result))
+            _write(directory / "junit.xml", render_junit(outcome.result))
+            _write(directory / "report.html", render_html(outcome.result))
+            _write(directory / "summary.md", render_markdown(outcome.result))
+        _write(output_dir / "suite.json", json.dumps(suite_document(result), indent=2) + "\n")
+        _write(output_dir / "junit.xml", render_suite_junit(result))
+        _write(output_dir / "summary.md", render_suite_markdown(result))
+
+    with _tolerate_closed_stdout():
+        if output_format is ReportFormat.JSON:
+            typer.echo(json.dumps(suite_document(result), indent=2))
+        elif output_format is ReportFormat.MARKDOWN:
+            typer.echo(render_suite_markdown(result), nl=False)
+        else:
+            _print_suite(result, verbose=verbose)
+            out.print(Text(f"wrote {output_dir}/", style="dim"), soft_wrap=True)
+    raise typer.Exit(result.exit_code)
+
+
+def _print_suite(result: SuiteResult, *, verbose: bool) -> None:
+    for outcome in result.scenarios:
+        if outcome.result is not None and (verbose or outcome.verdict is not Verdict.PASS):
+            out.rule(Text(outcome.name, style="bold"), align="left")
+            print_comparison(outcome.result, out, verbose=verbose)
+            out.print()
+        elif outcome.error is not None:
+            out.rule(Text(outcome.name, style="bold"), align="left")
+            out.print(Text("error: ", style="bold red") + Text(outcome.error))
+            out.print()
+    out.rule(Text("suite", style="bold"), align="left")
+    table = Table(show_edge=False, pad_edge=False, header_style="bold")
+    table.add_column("scenario", no_wrap=True)
+    table.add_column("verdict", no_wrap=True)
+    table.add_column("exit", justify="right")
+    table.add_column("summary")
+    for outcome in result.scenarios:
+        if outcome.verdict is not None:
+            verdict = Text(outcome.verdict.value, style=VERDICT_STYLE[outcome.verdict])
+        else:
+            verdict = Text("ERROR", style="bold red")
+        table.add_row(outcome.name, verdict, str(outcome.exit_code), outcome.summary)
+    out.print(table)
+    out.print(Text(result.summary, style="bold"))
+
+
+baseline_app = typer.Typer(
+    help="Store baselines as files, keyed by scenario and name, and compare against them "
+    "with --baseline @NAME.",
+    no_args_is_help=True,
+    rich_markup_mode="markdown",
+)
+app.add_typer(baseline_app, name="baseline")
+
+
+@baseline_app.command("save")
+def baseline_save(
+    source: Annotated[Path, typer.Argument(help="Run result to store (any adapter's input).")],
+    name: Annotated[str, typer.Option("--name", "-n", help="Baseline name, e.g. a branch.")] = (
+        "main"
+    ),
+    adapter: AdapterOpt = "json",
+    adapter_option: AdapterOptionsOpt = None,
+    store: StoreOpt = None,
+    force: Annotated[bool, typer.Option("--force", help="Replace an existing baseline.")] = False,
+) -> None:
+    """Normalize a run result and store it as a baseline of its scenario."""
+    with _guard():
+        run = _load(adapter, source, parse_options(adapter_option or []))
+        path = save_baseline(run, name, source=source, store=store, force=force)
+    out.print(
+        Text("saved ", style="green")
+        + Text(f"{run.scenario.id} @{name}", style="bold")
+        + Text(f" ({run.run_id}, {len(run.trials)} trials) to {path}", style="dim"),
+        soft_wrap=True,
+    )
+
+
+@baseline_app.command("list")
+def baseline_list(store: StoreOpt = None, output_format: FormatOpt = OutputFormat.TEXT) -> None:
+    """List stored baselines."""
+    with _guard():
+        found = list_baselines(store)
+    if output_format is OutputFormat.JSON:
+        typer.echo(
+            json.dumps(
+                [
+                    {
+                        "scenario": b.scenario,
+                        "name": b.name,
+                        "path": str(b.path),
+                        "run_id": b.run.run_id if b.run else None,
+                        "trials": len(b.run.trials) if b.run else None,
+                        "commit": b.run.source.commit if b.run else None,
+                        "error": b.error,
+                    }
+                    for b in found
+                ],
+                indent=2,
+            )
+        )
+        return
+    if not found:
+        out.print(Text(f"no baselines in {store or DEFAULT_STORE}", style="dim"))
+        return
+    table = Table(show_edge=False, pad_edge=False, header_style="bold")
+    for column in ("scenario", "name", "run", "trials", "commit", "created"):
+        table.add_column(column, justify="right" if column == "trials" else "left")
+    for b in found:
+        if b.run is None:
+            table.add_row(b.scenario, b.name, Text(f"unreadable: {b.error}", style="red"))
+            continue
+        created = b.run.created_at.date().isoformat() if b.run.created_at else "-"
+        table.add_row(
+            b.scenario,
+            Text(f"@{b.name}", style="bold"),
+            b.run.run_id,
+            str(len(b.run.trials)),
+            (b.run.source.commit or "-")[:12],
+            created,
+        )
+    out.print(table)
+
+
+@baseline_app.command("path")
+def baseline_path_command(
+    scenario: Annotated[str, typer.Argument(help="Scenario id.")],
+    name: Annotated[str, typer.Option("--name", "-n", help="Baseline name.")] = "main",
+    store: StoreOpt = None,
+) -> None:
+    """Print the file of a stored baseline (for scripts)."""
+    with _guard():
+        path, _ = load_baseline(scenario, name, store)
+    typer.echo(str(path))
 
 
 @app.command()
