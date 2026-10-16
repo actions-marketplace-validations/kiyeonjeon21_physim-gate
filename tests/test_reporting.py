@@ -92,7 +92,7 @@ def test_html_is_self_contained_and_escaped() -> None:
 
 def test_markdown_summary() -> None:
     text = render_markdown(result())
-    assert text.startswith(MARKER + "\n### ❌ PhySim Gate: FAIL\n")
+    assert text.startswith(MARKER + "\n### ❌ PhySim Gate: FAIL\n\nRegression detected in ")
     rows = [line for line in text.splitlines() if line.startswith("| `")]
     assert len(rows) == 4
     assert rows[0].startswith("| `speed` ↑ (m/s) | 2 | 0 | +2 |")

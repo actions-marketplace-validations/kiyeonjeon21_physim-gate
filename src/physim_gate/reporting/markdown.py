@@ -118,7 +118,7 @@ def _render(result: ComparisonResult, *, reasons: bool, fold_passing: bool) -> s
         MARKER,
         f"### {_ICON[result.verdict]} PhySim Gate: {result.verdict.value}",
         "",
-        _cell(result.summary),
+        _cell(result.summary[:1].upper() + result.summary[1:]),
         "",
         f"Scenario {_code(result.candidate.scenario.id)} ({result.candidate.domain.value}), "
         f"simulator {', '.join(_code(s) for s in sims)}.  ",
