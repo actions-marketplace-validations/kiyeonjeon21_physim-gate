@@ -95,16 +95,18 @@ def test_markdown_summary() -> None:
     assert text.startswith(MARKER + "\n### ❌ PhySim Gate: FAIL\n\nRegression detected in ")
     rows = [line for line in text.splitlines() if line.startswith("| `")]
     assert len(rows) == 4
-    assert rows[0].startswith("| `speed` ↑ (m/s) | 2 | 0 | +2 |")
-    assert rows[0].endswith("| 30 pairs | ❌ FAIL |")
-    assert rows[1].endswith("⚠️ INCONCLUSIVE (non-blocking) |") or "(non-blocking)" in rows[1]
+    # Non-breaking spaces keep values whole in narrow pull-request comments.
+    assert (
+        rows[0] == "| `speed`\u00a0↑ (m/s) | 2 | 0 | +2 | [+2,\u00a0+2] | 0.5 | 30 | ❌\u00a0FAIL |"
+    )
+    assert "(non-blocking)" in rows[1]
     assert "`gone`" in rows[3]
-    assert rows[3].endswith("| ⛔ INVALID |")
+    assert rows[3].endswith("| ⛔\u00a0INVALID |")
     # Untrusted strings only appear inside code spans, which GitHub renders literally.
     assert "`cand <script>`" in text
     assert "<script>" not in text.replace("`cand <script>`", "")
     assert "<details><summary>" in text
-    assert "**speed**: ❌ FAIL" in text
+    assert "**speed**: ❌\u00a0FAIL" in text
     assert "speed**: ✅" not in text
 
 
@@ -117,7 +119,7 @@ def test_markdown_escapes_table_breaking_names() -> None:
     )
     assert "`x\\|y'z`" in text
     row = next(line for line in text.splitlines() if line.startswith("| `m`"))
-    assert row.startswith("| `m` ↑ (a\\|b) |")
+    assert row.startswith("| `m`\u00a0↑ (a\\|b) |")
     assert row.replace("\\|", "").count("|") == 9
 
 

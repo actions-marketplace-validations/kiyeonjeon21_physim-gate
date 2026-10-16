@@ -14,6 +14,8 @@ from physim_gate.comparison import ComparisonResult, MetricComparison, RunSummar
 from physim_gate.reporting.format import interval, method_label, num, signed
 
 MARKER = "<!-- physim-gate -->"
+#: Keeps short values on one line in narrow tables such as pull-request comments.
+NBSP = "\u00a0"
 #: GitHub's limit for comment bodies is 65,536 characters; leave room for surrounding text.
 MAX_CHARS = 60_000
 
@@ -44,7 +46,7 @@ def _code(text: str) -> str:
 
 
 def _verdict(metric: MetricComparison) -> str:
-    label = f"{_ICON[metric.verdict]} {metric.verdict.value}"
+    label = f"{_ICON[metric.verdict]}{NBSP}{metric.verdict.value}"
     if metric.verdict is not Verdict.PASS and not metric.blocking:
         label += " (non-blocking)"
     return label
@@ -53,7 +55,7 @@ def _verdict(metric: MetricComparison) -> str:
 def _metric_name(metric: MetricComparison) -> str:
     arrow = ""
     if metric.direction is not None:
-        arrow = " ↑" if metric.direction.value == "higher_is_better" else " ↓"
+        arrow = NBSP + ("↑" if metric.direction.value == "higher_is_better" else "↓")
     unit = f" ({_cell(metric.unit)})" if metric.unit else ""
     optional = " optional" if not metric.required else ""
     return f"{_code(metric.name)}{arrow}{unit}{optional}"
@@ -61,7 +63,7 @@ def _metric_name(metric: MetricComparison) -> str:
 
 def _count(metric: MetricComparison) -> str:
     if metric.pairing is not None and metric.pairing.mode == "paired":
-        return f"{metric.pairing.n_pairs} pairs"
+        return str(metric.pairing.n_pairs)
     if metric.baseline is not None and metric.candidate is not None:
         return f"{metric.baseline.n}/{metric.candidate.n}"
     return "-"
@@ -74,7 +76,7 @@ def _row(metric: MetricComparison) -> str:
         num(n.baseline) if n else "-",
         num(n.candidate) if n else "-",
         signed(n.degradation) if n else "-",
-        interval(metric.evidence.degradation_ci),
+        interval(metric.evidence.degradation_ci).replace(", ", "," + NBSP),
         num(n.margin) if n else "-",
         _count(metric),
         _verdict(metric),
