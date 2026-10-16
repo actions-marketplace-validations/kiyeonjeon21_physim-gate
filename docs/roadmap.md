@@ -3,7 +3,7 @@
 This is a plan, not a promise.
 Priorities follow what makes the gate trustworthy and useful with real simulators first.
 
-## v0.1 (released)
+## v0.1
 
 v0.1.1 fixed the findings of the [OSS readiness review](oss-readiness-review.md), most importantly score intervals for 0/1 metrics.
 
@@ -13,15 +13,22 @@ v0.1.1 fixed the findings of the [OSS readiness review](oss-readiness-review.md)
 - Terminal, JSON, JUnit XML and self-contained HTML reports.
 - Adapters: `json`, `synthetic`, optional `gymnasium`; entry-point plugin contract with an example CSV plugin.
 
-## v0.2 (next)
+## v0.2
 
-1. **LeRobot adapter.** Read `lerobot-eval`'s `eval_info.json` (per-episode reward, success and seed), including multi-task output, with fixtures created from the documented format and validated against real output before release.
-2. **Sample-size guidance.** Score intervals for 0/1 metrics and a measured error-rate table landed after the v0.1.0 review. Next: a `physim-gate plan` helper or a documented table that answers "how many trials do I need to decide this margin?", which is the question rare-event users hit first.
-3. **Small-sample bootstrap accuracy.** The study shows about 4-5.5% per-side error at 10 trials. Evaluate BCa or studentized intervals, or a higher default `min_samples`, against the same study.
+- **LeRobot adapter** for `lerobot-eval`'s `eval_info.json`, multi-task and single-task layouts, validated against real PushT output.
+- **Sample-size planning** with `physim-gate plan`: exact verdict probabilities for unpaired 0/1 metrics, a normal approximation for continuous ones.
+- **Markdown summary** (`--markdown`, `--format markdown`) sized for GitHub's comment limit.
+- **GitHub Action** (`uses: kiyeonjeon21/physim-gate@<tag>`) with job summary, outputs and an updating pull-request comment.
+- **Release workflow** for PyPI with trusted publishing, ready but not yet enabled.
+
+## Next
+
+1. **PyPI release** under `physim-gate`, once trusted publishing is configured on pypi.org.
+2. **Small-sample bootstrap accuracy.** The study shows about 4-5.5% per-side error at 10 trials. Evaluate BCa or studentized intervals, or a higher default `min_samples`, against the same study.
+3. **Paired sample-size planning.** Pairing usually needs fewer trials; planning currently assumes unpaired runs.
 4. **Baseline management.** A small local store (`physim-gate baseline save/show`) keyed by scenario and branch, still file-based and Git-friendly.
 5. **Multi-run suites.** One config that gates several scenarios at once and aggregates verdicts, with per-scenario JUnit suites.
-6. **PyPI release** under `physim-gate`, after a final name check, plus a reusable GitHub Action wrapper.
-7. **Markdown summary output** for PR comments (`--markdown`), sized for GitHub's comment limits.
+6. **More real LeRobot data.** Multi-task suites such as LIBERO, which need a GPU-capable environment to produce.
 
 ## Later
 

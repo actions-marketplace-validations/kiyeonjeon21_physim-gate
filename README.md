@@ -13,8 +13,8 @@ It reads result files that your existing simulation jobs already produce.
 ```text
 your sim job ──> baseline.json ─┐
                                 ├─> physim-gate compare ──> verdict + exit code
-your sim job ──> candidate.json ┘          │                 comparison.json
-                    gate.yaml ─────────────┘                 junit.xml, report.html
+your sim job ──> candidate.json ┘          │                 comparison.json, junit.xml
+                    gate.yaml ─────────────┘                 report.html, summary.md
 ```
 
 ## Contents
@@ -24,6 +24,8 @@ your sim job ──> candidate.json ┘          │                 comparison.
 - [Quickstart (no GPU, no simulator)](#quickstart-no-gpu-no-simulator)
 - [Example inputs](#example-inputs)
 - [Example report](#example-report)
+- [Real simulator data: LeRobot](#real-simulator-data-lerobot)
+- [How many trials do you need?](#how-many-trials-do-you-need)
 - [How the verdict is reached](#how-the-verdict-is-reached)
 - [Statistical limitations](#statistical-limitations)
 - [CI usage](#ci-usage)
@@ -59,7 +61,7 @@ The short version is below; [docs/competitive-landscape.md](docs/competitive-lan
 | [RoboCI](https://github.com/gagandeepreehal/roboci) | Runs robotics scenario suites (mock, CARLA, Isaac, Gazebo, ROS 2 adapters), tracks failures, compares one aggregate per run against a baseline with a percentage threshold, includes a dashboard | Closest overlap. PhySim Gate never runs a simulator and compares per-trial distributions with an uncertainty interval instead of one number per run |
 | [robot-sim-test-harness](https://github.com/Pratyush150/robot-sim-test-harness) | YAML scenarios with temporal assertions on a kinematic mock, trace diffs, per-metric tolerance checks against a committed baseline | Gates on pass/fail transitions and tolerance drift of single values. PhySim Gate compares distributions of trials and reports uncertainty |
 | Python statistics and benchmarking tools: [scipy](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.bootstrap.html), [statsmodels](https://www.statsmodels.org/), [rliable](https://github.com/google-research/rliable), [asv](https://github.com/airspeed-velocity/asv), [Bencher](https://bencher.dev/) | Bootstrap and score intervals, non-inferiority tests, RL evaluation statistics, statistical benchmark regression detection | PhySim Gate's statistics are standard methods, not new ones. What it adds is the run schema, the pairing and missing-data rules, the three-way verdict and the CI outputs around them |
-| [LeRobot](https://github.com/huggingface/lerobot) `lerobot-eval` | Evaluates a policy and writes per-episode rewards and success to `eval_info.json` | An upstream producer. A LeRobot adapter is the first item on the roadmap |
+| [LeRobot](https://github.com/huggingface/lerobot) `lerobot-eval` | Evaluates a policy and writes per-episode rewards and success to `eval_info.json` | An upstream producer. The built-in `lerobot` adapter reads its `eval_info.json` |
 | [Scenic](https://github.com/Scenic-Foundation/Scenic), [VerifAI](https://github.com/BerkeleyLearnVerify/VerifAI) | Scenario generation, falsification and formal analysis | Upstream and complementary. They decide what to simulate; PhySim Gate decides whether a change made the outcome worse |
 | [ros2_tracing](https://github.com/ros2/ros2_tracing) | Low-overhead LTTng tracing of ROS 2 | A possible future artifact source. No comparison logic |
 
@@ -68,7 +70,7 @@ What PhySim Gate aims to do well:
 1. **Simulator independence.** It evaluates existing run artifacts. Any simulator that can write JSON, or that has an adapter, works.
 2. **Uncertainty-aware gates built on standard methods.** A confidence interval of the *difference*, paired when trials match (a bootstrap for continuous metrics, a Newcombe score interval for 0/1 metrics), with an explicit `INCONCLUSIVE` outcome. Measured error rates are published in [docs/comparison-semantics.md](docs/comparison-semantics.md#measured-error-rates).
 3. **Provenance.** Simulator version, seeds, source commit, environment and input file hashes travel with every result.
-4. **Machine-readable output.** Versioned JSON, JUnit XML, documented exit codes, and a self-contained HTML report.
+4. **Machine-readable output.** Versioned JSON, JUnit XML, documented exit codes, a self-contained HTML report, and a Markdown summary for pull requests.
 5. **A minimal plugin contract.** One entry point and one method, no changes to the core package.
 6. **Local first.** `pip install` and run. No service, database, Docker, GPU or account.
 
@@ -117,6 +119,7 @@ Other commands:
 physim-gate init --from my_run.json     # starter gate.yaml from an existing result
 physim-gate validate my_run.json        # schema check plus warnings (missing values, no commit, ...)
 physim-gate report comparison.json --html report.html   # re-render a saved comparison
+physim-gate plan --rate 0.9 --margin 0.05   # trials needed to decide a 0/1 metric
 physim-gate adapters                    # built-in and installed adapters
 physim-gate schema run                  # JSON Schema for producers in any language
 ```
@@ -202,6 +205,54 @@ It shows the verdicts, each metric's degradation interval against its margin, th
 
 ![Metric detail](docs/images/report-metric.png)
 
+## Real simulator data: LeRobot
+
+[`examples/lerobot-pusht/`](examples/lerobot-pusht) holds unedited `eval_info.json` files from LeRobot's `lerobot-eval` on the PushT simulator, 100 episodes each, and a gate config.
+The built-in `lerobot` adapter reads them directly, or the output directory that contains them:
+
+```bash
+physim-gate compare --adapter lerobot -O start_seed=1000 \
+  -b examples/lerobot-pusht/baseline \
+  -c examples/lerobot-pusht/candidate-n-action-steps-8 \
+  -g examples/lerobot-pusht/gate.yaml
+echo $?   # 1: max_reward regressed; the success drop is INCONCLUSIVE at 100 episodes
+```
+
+The candidate re-plans every 8 steps instead of every 32.
+Its success rate fell from 11% to 1%, but with 100 episodes per run the interval of that drop (+3.4 to +17.7 points) still includes the 5-point margin, so `success` is `INCONCLUSIVE` rather than `FAIL`.
+`max_reward` dropped clearly enough to fail the gate.
+A second evaluation of the unchanged policy passes, because it reproduced every success flag exactly.
+The example's [README](examples/lerobot-pusht/README.md) explains the runs and how to reproduce them.
+
+Each episode becomes a trial with `success`, `sum_reward` and `max_reward`.
+`lerobot-eval` seeds episode `i` of every task with `--seed + i`, so two evaluations with the same `--seed` are compared as matched pairs.
+Both layouts are read: `per_task` (LeRobot 0.4.0 and later) and `per_episode` (0.3.x and earlier).
+
+## How many trials do you need?
+
+The gate only says `PASS` or `FAIL` when the confidence interval clears the margin, and 0/1 metrics need far more trials than most evaluations run.
+`physim-gate plan` answers the question before you spend the compute:
+
+```text
+$ physim-gate plan --rate 0.9 --margin 0.05
+plan for a 0/1 metric, higher is better
+  baseline rate     0.9
+  candidate rate    0.9
+  true degradation  0
+  margin            0.05
+  goal              PASS with probability >= 80%, 95% intervals
+  method            exact (unpaired Newcombe score interval)
+
+  573 trials per run
+  verdicts at that size: PASS 80.1%  INCONCLUSIVE 19.9%  FAIL <0.1%
+```
+
+To show that an unchanged 90% success rate has not dropped by more than 5 points, plan for about 570 episodes per run.
+With 50 episodes per run, a common size for robot evaluations, the gate says `INCONCLUSIVE` about 9 times in 10, and that is the correct answer for so little data.
+For 0/1 metrics the probabilities are exact: every possible outcome is weighted by its binomial probability and decided with the engine's own score interval.
+Pass `--true-degradation` to size a run that should detect a regression, and `--stdev` instead of `--rate` for continuous metrics (a normal approximation).
+[docs/comparison-semantics.md](docs/comparison-semantics.md#planning-the-number-of-trials) has the details.
+
 ## How the verdict is reached
 
 For every gated metric the result keeps three layers apart:
@@ -227,7 +278,7 @@ The built-in metric `physim.failure_rate`, derived from each trial's status, let
 PhySim Gate makes a narrow, explicit claim, and it is worth knowing where that claim is weak:
 
 - **The intervals are approximate.** In a [Monte Carlo study](docs/comparison-semantics.md#measured-error-rates) of the real engine, a metric whose true degradation equals the margin was wrongly called PASS or FAIL in about 2-3.5% of runs each with 30 or more trials, but up to about 5.5% each with 10 trials. `min_samples` (default 10) is a floor, not a guarantee.
-- **Rare events need many trials.** With a 1% baseline collision rate and a 2-point margin, 80 trials per run are rarely enough to reach any verdict other than `INCONCLUSIVE`, even when the candidate's true rate is 6%. That is the honest answer for so little data. Plan for hundreds of trials when gating rare events.
+- **Rare events need many trials.** With a 1% baseline collision rate and a 2-point margin, 80 trials per run give `INCONCLUSIVE` about 89% of the time, even when the candidate's true rate is 6%. That is the honest answer for so little data. `physim-gate plan` tells you how many trials a decision needs.
 - **Each metric is tested separately.** With many gated metrics, the chance that at least one shows a spurious regression grows. `policy.correction: bonferroni` is available but off by default.
 - **Seeds do not make physics deterministic.** Matching `trial_id`s are treated as matched *conditions*. Pairing reduces noise from shared conditions; it does not assume bitwise-identical rollouts.
 - **Inconclusive is a real answer.** It means the data cannot tell. The fix is more trials, a less noisy metric, or a deliberate policy decision, not a looser reading of the numbers.
@@ -247,19 +298,29 @@ PhySim Gate makes a narrow, explicit claim, and it is worth knowing where that c
 | 3 | No regression shown, but a blocking metric is inconclusive or invalid |
 | 4 | Internal error (a bug; please report it) |
 
-A minimal GitHub Actions step:
+On GitHub Actions, use the action in this repository:
 
 ```yaml
-- name: Simulation regression gate
-  run: |
-    physim-gate compare \
-      --baseline results/baseline.json \
-      --candidate results/candidate.json \
-      --config gate.yaml \
-      --junit results/junit.xml --html results/report.html --output results/comparison.json
+- uses: kiyeonjeon21/physim-gate@v0.2.0
+  with:
+    baseline: results/baseline.json
+    candidate: results/candidate.json
+    config: gate.yaml
+    comment: "true"   # post the summary on the pull request, updated on every push
 ```
 
+It installs PhySim Gate from the same tag, writes `comparison.json`, `junit.xml`, `report.html` and `summary.md`, adds the Markdown summary to the job summary, and fails the step unless the gate passes.
+Its outputs are `verdict`, `exit-code` and `report-dir`; `fail: "false"` leaves the decision to later steps.
 [`examples/github-actions/physim-gate.yml`](examples/github-actions/physim-gate.yml) is a complete workflow that also uploads the report and publishes the JUnit results.
+
+Anywhere else, call the CLI:
+
+```bash
+physim-gate compare -b results/baseline.json -c results/candidate.json -g gate.yaml \
+  --junit results/junit.xml --html results/report.html --markdown results/summary.md
+```
+
+`--markdown` writes a summary sized for a pull-request comment, and `--format markdown` prints it to stdout.
 `--format json` prints the comparison result to stdout for other tooling.
 Set `SOURCE_DATE_EPOCH` to make `generated_at`, and therefore the output files, byte-for-byte reproducible.
 
@@ -333,16 +394,19 @@ With the `gymnasium` extra, `physim_gate.adapters.gymnasium.run_gymnasium(env_id
 
 ## Supported and not supported
 
-| Capability | Status in v0.1.1 |
+| Capability | Status in v0.2.0 |
 |---|---|
 | Run-result schema 1.0 (JSON), JSON Schema export | Supported |
 | Baseline vs candidate comparison, paired and unpaired bootstrap | Supported |
 | Absolute, relative and combined margins; mean or median | Supported |
-| Terminal, JSON, JUnit XML and self-contained HTML output | Supported |
+| Terminal, JSON, JUnit XML, Markdown and self-contained HTML output | Supported |
+| GitHub Action with pull-request comments | Supported |
+| Sample-size planning (`physim-gate plan`) | Supported: exact for unpaired 0/1 metrics, approximate for continuous ones |
 | Third-party adapters via entry points | Supported |
 | Built-in adapters: `json`, `synthetic` (demo/tests) | Supported |
 | `gymnasium` adapter (optional extra, CPU classic-control environments tested) | Supported, tested with CartPole only |
-| LeRobot, CARLA, ROS 2 bags, PX4 SITL, Isaac Sim adapters | **Not implemented** (see roadmap) |
+| `lerobot` adapter for `lerobot-eval` output | Supported, tested with real LeRobot 0.6.2 output on PushT; LIBERO and other multi-task suites only with constructed files |
+| CARLA, ROS 2 bags, PX4 SITL, Isaac Sim adapters | **Not implemented** (see roadmap) |
 | Running simulators, scheduling jobs, scenario generation | Out of scope |
 | Dashboards, hosted service, accounts | Out of scope |
 | Time-series or trajectory-level comparison (only per-trial scalars today) | Not implemented |
@@ -351,14 +415,13 @@ With the `gymnasium` extra, `physim_gate.adapters.gymnasium.run_gymnasium(env_id
 ## Roadmap
 
 The near-term plan is in [docs/roadmap.md](docs/roadmap.md).
-In short, v0.2 focuses on real producers and better statistics for rare events:
-a LeRobot `eval_info.json` adapter, exact or score intervals for binary metrics, a baseline store keyed by scenario, and PyPI publication.
-Later versions look at ROS 2 bag and PX4 SITL log adapters, multi-scenario suites, and trajectory-level metrics.
+Next up: more accurate intervals at small sample sizes, a baseline store keyed by scenario, multi-scenario suites, and PyPI publication.
+Later versions look at ROS 2 bag and PX4 SITL log adapters and trajectory-level metrics.
 
 ## Contributing and license
 
 Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
 The architecture is described in [docs/architecture.md](docs/architecture.md).
-All example data in this repository is synthetic.
+All example data in this repository is synthetic, except [`examples/lerobot-pusht/`](examples/lerobot-pusht), which is real LeRobot output from a public checkpoint.
 
 PhySim Gate is licensed under the [Apache License 2.0](LICENSE).

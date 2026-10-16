@@ -15,6 +15,15 @@ Where something could not be verified, it says so.
 - **Several claims overstated the project** and have been corrected, most importantly the claimed error rate and the novelty of the statistics.
 - **The differentiation is real but narrow.** The statistics are standard methods available in scipy and statsmodels. What PhySim Gate adds is the combination of a simulator-independent per-trial schema, explicit rules for pairing and missing data, a three-way verdict and CI outputs. No user has validated that this combination is worth a separate tool yet.
 
+## Follow-up in v0.2.0
+
+The review itself is unchanged below; this section records what happened to the open items since.
+
+- **#14, sample-size guidance: addressed.** `physim-gate plan` computes how many trials a verdict needs, exactly for unpaired 0/1 metrics and by normal approximation for continuous ones. See [comparison-semantics.md](comparison-semantics.md#planning-the-number-of-trials).
+- **#28, real simulator data: addressed.** [`examples/lerobot-pusht/`](../examples/lerobot-pusht) gates real `lerobot-eval` output through the new `lerobot` adapter, and CI runs it through the GitHub Action.
+- **#23 and #24, hygiene: partly addressed.** Dependabot now covers GitHub Actions and pip, and `SECURITY.md` exists. Actions are still pinned by tag, and there is no code of conduct yet.
+- **Still open:** #13 (small-sample bootstrap accuracy), #15 to #22, #25 to #27.
+
 ## How the review was done
 
 | Area | What was done |
