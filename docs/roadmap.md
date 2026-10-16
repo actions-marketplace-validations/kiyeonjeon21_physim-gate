@@ -19,16 +19,15 @@ v0.1.1 fixed the findings of the [OSS readiness review](oss-readiness-review.md)
 - **Sample-size planning** with `physim-gate plan`: exact verdict probabilities for unpaired 0/1 metrics, a normal approximation for continuous ones.
 - **Markdown summary** (`--markdown`, `--format markdown`) sized for GitHub's comment limit.
 - **GitHub Action** (`uses: kiyeonjeon21/physim-gate@<tag>`) with job summary, outputs and an updating pull-request comment.
-- **Release workflow** for PyPI with trusted publishing, ready but not yet enabled.
+- **PyPI release** under `physim-gate`, published by a release workflow with trusted publishing.
 
 ## Next
 
-1. **PyPI release** under `physim-gate`, once trusted publishing is configured on pypi.org.
-2. **Small-sample bootstrap accuracy.** The study shows about 4-5.5% per-side error at 10 trials. Evaluate BCa or studentized intervals, or a higher default `min_samples`, against the same study.
-3. **Paired sample-size planning.** Pairing usually needs fewer trials; planning currently assumes unpaired runs.
-4. **Baseline management.** A small local store (`physim-gate baseline save/show`) keyed by scenario and branch, still file-based and Git-friendly.
-5. **Multi-run suites.** One config that gates several scenarios at once and aggregates verdicts, with per-scenario JUnit suites.
-6. **More real LeRobot data.** Multi-task suites such as LIBERO, which need a GPU-capable environment to produce.
+1. **Small-sample bootstrap accuracy.** The study shows about 4-5.5% per-side error at 10 trials. Evaluate BCa or studentized intervals, or a higher default `min_samples`, against the same study.
+2. **Paired sample-size planning.** Pairing usually needs fewer trials; planning currently assumes unpaired runs.
+3. **Baseline management.** A small local store (`physim-gate baseline save/show`) keyed by scenario and branch, still file-based and Git-friendly.
+4. **Multi-run suites.** One config that gates several scenarios at once and aggregates verdicts, with per-scenario JUnit suites.
+5. **More real LeRobot data.** Multi-task suites such as LIBERO, which need a GPU-capable environment to produce.
 
 ## Later
 

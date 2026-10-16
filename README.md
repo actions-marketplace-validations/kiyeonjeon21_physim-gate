@@ -77,13 +77,10 @@ What PhySim Gate aims to do well:
 ## Quickstart (no GPU, no simulator)
 
 PhySim Gate needs Python 3.11 or newer.
-It is not published on PyPI yet, so install it from a clone:
 
 ```bash
-git clone https://github.com/kiyeonjeon21/physim-gate.git
-cd physim-gate
 python -m venv .venv && source .venv/bin/activate
-python -m pip install -e ".[dev]"
+python -m pip install physim-gate
 
 physim-gate demo
 ```
@@ -102,9 +99,11 @@ Nothing in the demo is precomputed.
 The runs come from YAML specs in [`src/physim_gate/fixtures/`](src/physim_gate/fixtures) and the verdicts come from the engine.
 The synthetic generator is not a simulator; it draws values from simple distributions so the gate can be exercised end to end.
 
-Then compare two files yourself:
+Then compare two files yourself.
+The example files live in the repository, so clone it first:
 
 ```bash
+git clone https://github.com/kiyeonjeon21/physim-gate.git && cd physim-gate
 physim-gate compare \
   --baseline examples/highway-merge/baseline.json \
   --candidate examples/highway-merge/candidate.json \
@@ -415,7 +414,7 @@ With the `gymnasium` extra, `physim_gate.adapters.gymnasium.run_gymnasium(env_id
 ## Roadmap
 
 The near-term plan is in [docs/roadmap.md](docs/roadmap.md).
-Next up: more accurate intervals at small sample sizes, a baseline store keyed by scenario, multi-scenario suites, and PyPI publication.
+Next up: more accurate intervals at small sample sizes, paired sample-size planning, a baseline store keyed by scenario, and multi-scenario suites.
 Later versions look at ROS 2 bag and PX4 SITL log adapters and trajectory-level metrics.
 
 ## Contributing and license

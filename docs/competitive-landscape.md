@@ -111,4 +111,4 @@ Whether that gap is worth a separate project depends on adoption; it has not bee
 At the time of writing, `physim-gate` was not registered on PyPI (the JSON API returned 404 for `physim-gate` and `physim_gate`), and a GitHub repository search for `physim-gate` returned no results.
 A different, unrelated PyPI project named `physim` exists (a library for physics animation videos).
 The names are distinct, but users searching for "physim" may see both.
-Nothing has been published under the `physim-gate` name yet.
+PhySim Gate has been published on PyPI as `physim-gate` since v0.2.0.
