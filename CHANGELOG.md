@@ -3,6 +3,21 @@
 All notable changes to this project are documented here.
 This file is generated from the commit history by git-cliff.
 
+## [0.1.1] - 2026-10-16
+
+### Bug fixes
+
+- **stats:** Use Newcombe score intervals for 0/1 metrics
+- **cli:** Keep exit codes correct for edge-case inputs
+
+### Documentation
+
+- Add OSS readiness review and correct overstated claims
+
+### Build and CI
+
+- Raise dependency floors to tested versions
+
 ## [0.1.0] - 2026-10-16
 
 ### Features
