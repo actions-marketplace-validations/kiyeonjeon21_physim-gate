@@ -83,6 +83,7 @@ def test_html_is_self_contained_and_escaped() -> None:
     assert "Share of trials with value 1" in html  # binary metric chart
     assert "Observed values" in html
     assert "Degradation vs allowed margin" in html
+    assert "- · statistic" not in html
 
 
 def test_terminal_table_and_narrow_layout() -> None:
@@ -107,3 +108,27 @@ def test_comparison_round_trip_and_rejections() -> None:
         comparison_from_data({**data, "schema_version": "2.0"})
     with pytest.raises(SchemaError, match="not a comparison result"):
         comparison_from_data({"run_id": "x"})
+
+
+def test_run_level_issues_are_reported_everywhere() -> None:
+    values = [float(i % 5) for i in range(N)]
+    base = make_run({"m": values}, run_id="b", scenario="left_turn")
+    cand = make_run({"m": values}, run_id="c", scenario="right_turn", status="partial")
+    result = compare_runs(base, cand, make_config({"m": {"max_absolute_degradation": 1}}))
+    assert result.verdict.value == "INVALID"
+
+    console = Console(width=140, record=True, color_system=None)
+    print_comparison(result, console)
+    text = console.export_text()
+    assert "[blocking] scenario differs" in text
+    assert "candidate run status is 'partial'" in text
+
+    suite = ET.fromstring(render_junit(result)).find("testsuite")
+    assert suite is not None
+    compat = [c for c in suite.findall("testcase") if c.get("name") == "run-compatibility"]
+    assert len(compat) == 1
+    assert compat[0].find("error") is not None
+
+    html = render_html(result)
+    assert "Run notes" in html
+    assert "scenario differs" in html

@@ -276,6 +276,7 @@ def test_missing_values_are_invalid_by_default() -> None:
     cand[3] = None
     metric, result = compare(ramp(10), cand)
     assert metric.verdict is Verdict.INVALID
+    assert metric.direction is not None  # identity is still reported
     assert "missing in 1 of 40" in metric.reasons[0]
     assert result.exit_code == 3
 

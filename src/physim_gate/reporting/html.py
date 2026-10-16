@@ -284,9 +284,11 @@ def _facts(metric: MetricComparison) -> str:
 
 
 def _metric_card(metric: MetricComparison) -> str:
-    meta = [direction_label(metric), f"statistic: {metric.statistic.value}"]
+    meta = [f"statistic: {metric.statistic.value}"]
     if metric.unit:
-        meta.insert(1, f"unit: {metric.unit}")
+        meta.insert(0, f"unit: {metric.unit}")
+    if metric.direction is not None:
+        meta.insert(0, direction_label(metric))
     if metric.numerical is not None:
         meta.append(f"margin basis: {metric.numerical.margin_basis}")
     if metric.evidence.method:
@@ -436,7 +438,7 @@ table.num td{font-variant-numeric:tabular-nums;white-space:nowrap}
 .meta{color:var(--muted);font-size:13px;margin:6px 0 0}
 .reasons{margin:12px 0 0;padding-left:18px;color:var(--ink2)}
 .reasons li{margin:2px 0}
-.facts{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px 16px;margin:16px 0 4px}
+.facts{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(160px,40%),1fr));gap:12px 16px;margin:16px 0 4px}
 .facts div{min-width:0}
 .facts dt{color:var(--muted);font-size:12px}
 .facts dd{margin:0;font-variant-numeric:tabular-nums;font-weight:500;overflow-wrap:anywhere}

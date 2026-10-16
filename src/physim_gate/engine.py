@@ -158,6 +158,7 @@ def _compare_metric(
     }
     try:
         unit, direction = _metric_identity(gate, baseline, candidate)
+        base |= {"unit": unit, "direction": direction}
         samples = _collect_samples(gate, baseline, candidate)
     except _Invalid as exc:
         return _finish(
@@ -169,8 +170,6 @@ def _compare_metric(
         )
 
     base |= {
-        "unit": unit,
-        "direction": direction,
         "pairing": samples.pairing,
         "baseline": _summarize(samples.baseline, samples.baseline_ids, baseline, gate.name),
         "candidate": _summarize(samples.candidate, samples.candidate_ids, candidate, gate.name),

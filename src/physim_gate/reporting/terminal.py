@@ -47,10 +47,12 @@ def _run_line(label: str, run: RunSummary) -> Text:
         parts.append(f"policy {run.policy.id}{version}")
     if run.source.commit:
         parts.append(f"commit {run.source.commit[:12]}" + ("+dirty" if run.source.dirty else ""))
-    sim = run.simulator.name + (f" {run.simulator.version}" if run.simulator.version else "")
-    parts.append(sim)
     text.append("  " + " | ".join(parts), style="dim")
     return text
+
+
+def _simulator(run: RunSummary) -> str:
+    return run.simulator.name + (f" {run.simulator.version}" if run.simulator.version else "")
 
 
 def _name(metric: MetricComparison) -> Text:
@@ -144,7 +146,14 @@ def print_comparison(
     header.append(f"  {result.summary}")
     console.print(header)
     scenario = result.candidate.scenario
-    console.print(Text(f"scenario  {scenario.id} ({result.candidate.domain.value})", style="dim"))
+    sims = {_simulator(result.baseline), _simulator(result.candidate)}
+    console.print(
+        Text(
+            f"scenario  {scenario.id} ({result.candidate.domain.value}) | "
+            f"simulator {' vs '.join(sorted(sims))}",
+            style="dim",
+        )
+    )
     console.print(_run_line("baseline", result.baseline))
     console.print(_run_line("candidate", result.candidate))
     console.print()

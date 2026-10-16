@@ -41,12 +41,13 @@ from physim_gate.schema import (
 from physim_gate.validation import lint_run
 
 EXIT_CODES_HELP = """\
-Exit codes:\n
-  0  gate passed / command succeeded\n
-  1  regression detected (compare) or invalid input (validate)\n
-  2  usage error, unreadable input, invalid config or result document\n
-  3  no regression shown, but a blocking metric is inconclusive or invalid\n
-  4  internal error (please report it)
+**Exit codes**
+
+- **0** gate passed, or the command succeeded
+- **1** regression detected (compare), or invalid input (validate)
+- **2** usage error, unreadable input, invalid config or result document
+- **3** no regression shown, but a blocking metric is inconclusive or invalid
+- **4** internal error (please report it)
 """
 
 app = typer.Typer(
@@ -56,7 +57,7 @@ app = typer.Typer(
     no_args_is_help=True,
     add_completion=False,
     pretty_exceptions_enable=False,
-    rich_markup_mode="rich",
+    rich_markup_mode="markdown",
     context_settings={"help_option_names": ["-h", "--help"]},
 )
 
