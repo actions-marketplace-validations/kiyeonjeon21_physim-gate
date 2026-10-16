@@ -233,7 +233,8 @@ def _emit(
         print_comparison(result, out, verbose=verbose)
         written = [str(p) for p in (output, junit, html, markdown) if p is not None]
         if written:
-            out.print(Text(f"wrote {', '.join(written)}", style="dim"))
+            # Never break a path across lines: it could not be copied from the terminal.
+            out.print(Text(f"wrote {', '.join(written)}", style="dim"), soft_wrap=True)
 
 
 @contextmanager

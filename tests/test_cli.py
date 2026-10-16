@@ -96,6 +96,16 @@ def test_compare_json_format_is_machine_readable(tmp_path: Path) -> None:
     assert data["exit_code"] == 0
 
 
+def test_written_paths_are_not_wrapped(tmp_path: Path) -> None:
+    deep = tmp_path / ("very-long-directory-name-" * 6) / "reports"
+    paths = materialize(tmp_path, "no_regression")
+    result = runner.invoke(
+        app, compare_args(paths, "--output", str(deep / "c.json"), "--html", str(deep / "r.html"))
+    )
+    assert result.exit_code == 0
+    assert f"wrote {deep / 'c.json'}, {deep / 'r.html'}\n" in result.output
+
+
 def test_markdown_format_on_stdout(tmp_path: Path) -> None:
     paths = materialize(tmp_path, "insufficient_evidence")
     saved = str(tmp_path / "c.json")
