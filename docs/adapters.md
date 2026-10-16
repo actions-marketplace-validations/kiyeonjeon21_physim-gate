@@ -65,6 +65,9 @@ Discovery rules:
 | `synthetic` | A YAML spec | Deterministic synthetic data for demos and tests. Options: `seed`, `trials` |
 | `gymnasium` | A YAML spec with `env_id`, `policy`, `run_id`, `episodes`, ... | Requires the `gymnasium` extra. Rolls out `policy` (a `module:function` mapping observations to actions, or `random`) once per seed. Tested with CartPole on CPU |
 
+Security note: adapters are ordinary Python code, and the `gymnasium` adapter imports and calls the policy function named in its spec.
+Treat adapter specs and installed plugins like any other code you run.
+
 ## Example: CSV
 
 [`examples/csv-adapter/`](../examples/csv-adapter) is a complete third-party adapter package that reads one CSV row per trial.

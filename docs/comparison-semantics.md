@@ -92,7 +92,12 @@ Set `max_absolute_degradation: 0` to tolerate no degradation at all.
 If the number of usable observations is below `min_samples` (default 10), no interval is computed and the evidence is `insufficient_samples`.
 For paired comparisons the count is the number of pairs; for unpaired comparisons it is the size of the smaller sample.
 
-Otherwise a percentile bootstrap estimates the uncertainty of the degradation:
+Otherwise an interval of the degradation is computed.
+The method depends on the data.
+
+### Continuous metrics: percentile bootstrap
+
+Unless every value in both samples is exactly 0 or 1, a percentile bootstrap estimates the uncertainty of the degradation:
 
 - **Paired:** resample pair indices with replacement, keeping each pair together, and recompute the statistic of each side.
 - **Unpaired:** resample each run's values independently.
@@ -100,6 +105,23 @@ Otherwise a percentile bootstrap estimates the uncertainty of the degradation:
   For relative margins, `margin*` is recomputed from the replicate's baseline statistic, so uncertainty in the baseline's magnitude is propagated.
 - `bootstrap_resamples` (default 10,000) replicates are drawn from a pseudo-random generator seeded with `"<bootstrap_seed>:<metric name>"`. Results are therefore reproducible across machines.
 - The two-sided interval at `confidence` (default 0.95) is taken from the replicate quantiles (linear interpolation).
+
+### 0/1 metrics: Newcombe score interval
+
+When the statistic is `mean` and every value in both samples is exactly 0 or 1 (success flags, collision indicators, `physim.failure_rate`), the difference of the two rates uses a score interval instead:
+
+- **Unpaired:** Newcombe's hybrid score interval, built from the Wilson intervals of both rates (Newcombe 1998, *Statistics in Medicine* 17:873, method 10).
+- **Paired:** Newcombe's interval for paired proportions, which adds the continuity-corrected correlation of the pairs (Newcombe 1998, *Statistics in Medicine* 17:2635, method 10).
+
+The reason is a failure of the bootstrap that matters in practice.
+If a run has no events at all, for example 0 collisions in 30 trials, every bootstrap replicate also has 0 events, so the bootstrap reports the rate as known to be exactly 0.
+Version 0.1.0 used the bootstrap here. In a 400-run simulation with 30 trials per run, it called a true increase from 1% to 6% (margin 2 points) "no regression" in 15% of runs, and at exactly the margin it said PASS in 38% of runs instead of at most about 2.5%.
+The score interval correctly reflects that 0 of 30 is compatible with a true rate of about 11%.
+
+For 0/1 metrics with a relative margin, the margin is computed once from the baseline's observed rate rather than per replicate.
+The unpaired implementation reproduces the published example (56/70 vs 48/80 gives 0.0524 to 0.3339); see `tests/test_stats.py`.
+
+### Classification
 
 The interval is always computed for the **difference** between the runs.
 PhySim Gate never compares two separate per-run intervals for overlap, because overlap is not a valid significance test in general.
@@ -112,8 +134,8 @@ The evidence is classified against the margin using the `excess` interval `[lo, 
 | `hi <= 0` | `non_inferior` | `PASS` |
 | otherwise | `inconclusive` | `INCONCLUSIVE` |
 
-Deciding on one side of a two-sided interval at confidence `c` corresponds to a one-sided error rate of about `(1 - c) / 2`, so about 2.5% at the default 0.95.
-This is approximate; see the limitations below.
+Deciding on one side of a two-sided interval at confidence `c` targets a one-sided error rate of `(1 - c) / 2`, so 2.5% at the default 0.95.
+The measured rates below show how close the implementation gets.
 
 **Multiple metrics.** With `policy.correction: bonferroni`, each metric uses confidence `1 - (1 - c) / k`, where `k` is the number of gated metrics.
 This widens every interval, which makes both `FAIL` and `PASS` harder to reach.
@@ -152,10 +174,36 @@ The default answers "is the candidate shown to be no worse than the margin?", no
 A gate built on the second question passes whenever the data is too noisy to show anything, which is exactly when a regression is most likely to slip through.
 Teams that prefer to block only on demonstrated regressions can set `policy.on_inconclusive: pass` explicitly, and the reports will still flag every inconclusive metric.
 
+## Measured error rates
+
+`scripts/error_rate_study.py` runs the real engine on synthetic data with a known true degradation, 1,000 times per row, at confidence 0.95 with 2,000 bootstrap resamples.
+At the margin both PASS and FAIL are errors, and each should be at most about 2.5%.
+Away from the margin, the wrong verdict should be near 0 and the correct one should grow with the number of trials.
+
+| Scenario | Trials per run | PASS | FAIL | INCONCLUSIVE |
+|---|---|---|---|---|
+| Normal, unpaired, at margin | 10 / 30 / 100 | 3.8% / 2.6% / 1.9% | 4.2% / 3.0% / 2.8% | rest |
+| Normal, paired (correlation 0.8), at margin | 10 / 30 / 100 | 4.0% / 2.5% / 1.7% | 4.7% / 3.1% / 2.6% | rest |
+| Lognormal, mean +10%, relative margin 10% | 10 / 30 / 100 | 5.5% / 3.0% / 3.4% | 5.4% / 3.5% / 2.5% | rest |
+| Normal, unpaired, no change (correct: PASS) | 10 / 30 / 100 | 24.8% / 50.0% / 93.8% | 0.3% / 0% / 0% | rest |
+| Normal, unpaired, degradation 2x margin (correct: FAIL) | 10 / 30 / 100 | 0% / 0% / 0% | 24.0% / 50.5% / 94.5% | rest |
+| Success 0.90 to 0.85, margin 0.05, unpaired, at margin | 30 / 100 / 300 | 2.4% / 3.2% / 2.9% | 2.5% / 2.8% / 2.1% | rest |
+| Success 0.90 to 0.85, margin 0.05, paired, at margin | 30 / 100 / 300 | 0.1% / 3.0% / 2.6% | 0.7% / 0.8% / 2.0% | rest |
+| Collision 0.01 to 0.03, margin 0.02, unpaired, at margin | 30 / 80 / 300 | 0% / 0.5% / 1.8% | 0% / 0.5% / 1.6% | rest |
+| Collision 0.01 to 0.06, margin 0.02, unpaired (correct: FAIL) | 30 / 80 / 300 | 0% / 0% / 0.1% | 0.5% / 11.4% / 54.4% | rest |
+| Collision 0.01 to 0.06, margin 0.02, paired (correct: FAIL) | 30 / 80 / 300 | 0% / 0% / 0% | 0.2% / 7.6% / 63.9% | rest |
+
+What this shows:
+
+- The bootstrap is somewhat anti-conservative with 10 trials (up to about 5.5% per side instead of 2.5%) and close to nominal from about 30 trials.
+- The score intervals for 0/1 metrics stay near or below nominal. For rare events they are conservative, which means many `INCONCLUSIVE` results unless there are hundreds of trials.
+- The Monte Carlo uncertainty of each percentage is roughly plus or minus 1 point.
+
 ## Limitations
 
-- Percentile bootstrap intervals undercover with small samples, skewed distributions and rare binary events. `min_samples` is a floor, not a guarantee of accuracy. Gating a 1% event rate with confidence needs hundreds or thousands of trials.
-- The median's bootstrap distribution is coarse for small samples.
+- Percentile bootstrap intervals undercover with small samples and skewed distributions (see the table above). `min_samples` is a floor, not a guarantee of accuracy. Gating a 1% event rate with confidence needs hundreds or thousands of trials.
+- The median's bootstrap distribution is coarse for small samples. The median of 0/1 data still uses the bootstrap and inherits its zero-event weakness; use the mean for 0/1 metrics.
+- The paired score interval is validated by simulation (the table above), not against a published worked example.
 - Trials are assumed exchangeable within a run. Strong drift within a run (for example thermal effects in hardware-in-the-loop) violates this.
 - Repeating a comparison until it passes ("optional stopping") invalidates the stated error rates.
 - Statistical evidence does not establish practical relevance. The margin encodes that, and it is your decision.

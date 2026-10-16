@@ -21,7 +21,7 @@ Each stage can be used alone from Python, and the CLI is a thin layer over them.
 | `schema.py` | The run-result models (`RunResult`, `Trial`, `MetricSpec`, ...), loading, strict validation and deterministic JSON output |
 | `validation.py` | Warnings for documents that are valid but suspicious (`physim-gate validate`) |
 | `config.py` | The gate config models and defaults resolution |
-| `stats.py` | Dependency-free point estimates, quantiles and the paired/unpaired bootstrap |
+| `stats.py` | Dependency-free point estimates, quantiles, the paired/unpaired bootstrap, and Wilson/Newcombe score intervals for 0/1 metrics |
 | `engine.py` | `compare_runs()`: run-level checks, per-metric numerical, evidence and policy layers |
 | `comparison.py` | The versioned `ComparisonResult` models, verdict vocabulary and exit codes |
 | `provenance.py` | Environment capture, git provenance, file hashes, `SOURCE_DATE_EPOCH` |
@@ -50,8 +50,9 @@ Each default can be relaxed explicitly in `gate.yaml`, and reports always show w
 **Pure-Python statistics.**
 Sample sizes in simulation regression testing are usually tens to thousands of trials.
 A stdlib bootstrap handles that comfortably: on an Apple Silicon laptop, 10,000 resamples took about 0.1 s per metric for 100 paired trials and about 1 s for 1,000 trials.
-It keeps the runtime dependencies to pydantic, typer and PyYAML, and produces identical numbers on every platform.
-NumPy or SciPy would be justified for much larger samples or more advanced intervals; see the roadmap.
+It keeps the runtime dependencies to pydantic, typer and PyYAML.
+The same methods exist in scipy and statsmodels; they are reimplemented here only to keep the install small, and they are checked against a published example and by the simulation study in `scripts/error_rate_study.py`.
+NumPy or SciPy would be justified for much larger samples or more advanced intervals (such as BCa); see the roadmap.
 
 **Self-contained results.**
 `ComparisonResult` embeds the gate config, both runs' provenance, the analyzed values and input file hashes.
@@ -73,7 +74,8 @@ A broken plugin is reported by `physim-gate adapters` and does not affect other 
 
 | Situation | Exception | CLI exit code |
 |---|---|---|
-| Unreadable file, invalid JSON/YAML, schema violation | `SchemaError` (with one line per problem) | 2 |
+| Unreadable input (missing, a directory, no permission) | `InputError` (a `SchemaError`) | 2 |
+| Invalid JSON/YAML, schema violation | `SchemaError` (with one line per problem) | 2 (`validate`: 1) |
 | Unknown or broken adapter, bad adapter option | `AdapterError` | 2 |
 | Valid inputs that cannot be compared (metric missing, unit mismatch, ...) | none; the metric is `INVALID` | 3 (if blocking) |
 | Anything else | unexpected exception, traceback printed | 4 |

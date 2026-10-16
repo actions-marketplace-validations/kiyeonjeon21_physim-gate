@@ -33,7 +33,7 @@ jobs:
       - name: Fetch the baseline
         # For example a result file committed on the main branch, or an artifact from the
         # last main-branch run. Pin it so the comparison is reproducible.
-        run: cp baselines/highway_merge.json results/baseline.json
+        run: mkdir -p results && cp baselines/highway_merge.json results/baseline.json
 
       - name: Compare
         id: gate

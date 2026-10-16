@@ -14,8 +14,8 @@ Priorities follow what makes the gate trustworthy and useful with real simulator
 ## v0.2 (next)
 
 1. **LeRobot adapter.** Read `lerobot-eval`'s `eval_info.json` (per-episode reward, success and seed), including multi-task output, with fixtures created from the documented format and validated against real output before release.
-2. **Better intervals for binary and rare-event metrics.** Score or exact intervals for differences of proportions (paired and unpaired), selected automatically for 0/1 metrics, with documented coverage from simulation studies included in the test suite.
-3. **Coverage study of the bootstrap.** A reproducible notebook-free script that measures actual error rates of the gate across sample sizes and distributions, published in the docs, so users can choose `min_samples` from data rather than intuition.
+2. **Sample-size guidance.** Score intervals for 0/1 metrics and a measured error-rate table landed after the v0.1.0 review. Next: a `physim-gate plan` helper or a documented table that answers "how many trials do I need to decide this margin?", which is the question rare-event users hit first.
+3. **Small-sample bootstrap accuracy.** The study shows about 4-5.5% per-side error at 10 trials. Evaluate BCa or studentized intervals, or a higher default `min_samples`, against the same study.
 4. **Baseline management.** A small local store (`physim-gate baseline save/show`) keyed by scenario and branch, still file-based and Git-friendly.
 5. **Multi-run suites.** One config that gates several scenarios at once and aggregates verdicts, with per-scenario JUnit suites.
 6. **PyPI release** under `physim-gate`, after a final name check, plus a reusable GitHub Action wrapper.

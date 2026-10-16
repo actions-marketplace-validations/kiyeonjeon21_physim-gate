@@ -22,7 +22,7 @@ physim-gate compare \
   -g examples/csv-adapter/data/gate.yaml
 ```
 
-The candidate is slightly slower per episode (about 0.16 s on average).
+The candidate is slower per episode (about 0.33 s on average, out of about 20 s).
 That is within the 5% relative margin, so the gate passes.
 
 The data is synthetic.

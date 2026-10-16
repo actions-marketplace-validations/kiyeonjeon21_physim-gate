@@ -1,9 +1,9 @@
 # Competitive landscape
 
-This page compares PhySim Gate with related open-source projects.
-It was written in October 2026 from each project's public README and documentation.
-The implementations were not inspected or reused.
-Items marked *unverified* could not be confirmed from the public material that was read.
+This page compares PhySim Gate with related open-source projects and tools.
+It was first written in October 2026 from public READMEs, then revised after reading the source of RoboCI and robot-sim-test-harness (shallow clones, read only; no code was run or reused).
+File references point into those repositories at the time of reading.
+Items marked *unverified* could not be confirmed.
 Corrections are welcome.
 
 ## RoboCI
@@ -13,12 +13,15 @@ Corrections are welcome.
 - Local-first evaluation of robotics and embodied-AI code before hardware: closed-loop scenario suites in a simulator, plus open-loop evaluation on datasets.
 - File-based runs (`summary.json`, `metrics.json`, `failures.json`, `provenance.json`, `regression.json`, replay timelines) and named baselines.
 - Failures have a lifecycle (open, fixed, regressed). Scenarios carry assertions such as no-collision and maximum speed.
-- `roboci compare` checks a run against a baseline with `--max-regression-percent`. No statistical testing is described (*unverified* whether the code has any).
+- `roboci compare` checks a run against a baseline with `--max-regression-percent` (default 5). A metric regresses if it is in a hardcoded direction list, moved the wrong way, and changed by more than the threshold (`roboci/regression/comparator.py`). Metrics outside the lists are "neutral" and never gate. Each side is one aggregate per run. There is no statistical testing in the code.
+- Zero baselines have an explicit rule (an absolute fallback). Metrics missing on either side are skipped silently.
 - A Typer CLI plus a FastAPI and Next.js dashboard. Mock simulator by default, with CARLA, Isaac Sim, Gazebo and ROS 2 adapters that need those tools installed.
 - JSON, HTML and Markdown reports. CI integration through exit codes and a PR-comment workflow.
 
 **Overlap:** high. Both compare runs against baselines, record provenance and integrate with CI.
-**Difference:** RoboCI orchestrates simulation and ships a dashboard. PhySim Gate only evaluates existing results and focuses on the decision itself: uncertainty-aware evidence, explicit inconclusive outcomes, and documented semantics for missing data and zero baselines.
+**Difference:** RoboCI orchestrates simulation and ships a dashboard. PhySim Gate only evaluates existing results and focuses on the decision itself: per-trial distributions, uncertainty intervals, explicit inconclusive outcomes, user-declared directions, and missing data that invalidates a metric instead of being skipped.
+Zero-baseline handling is not a differentiator; RoboCI has it too.
+RoboCI's provenance capture (git state and hashes of agent, suite and dataset) is comparable to or richer than PhySim Gate's.
 The two could be combined: RoboCI results could be converted into PhySim Gate run results by an adapter.
 
 ## robot-sim-test-harness
@@ -28,7 +31,8 @@ The two could be combined: RoboCI results could be converted into PhySim Gate ru
 - Regression tests for robot behavior written as YAML scenarios with scalar and temporal assertions (always, eventually, until), on a built-in kinematic mock.
 - Deterministic stepping, seeded random streams, trace recording, and a `diff` command that finds where two traces diverge.
 - Compares against a committed baseline with per-metric tolerances. Pass-to-fail transitions fail the build; metric drift warns unless strict mode is on.
-- Grid and Monte Carlo sweeps reported as pass-rate tables, and bisection to find failure boundaries. No significance testing is described.
+- Grid and Monte Carlo sweeps reported as pass-rate tables, and bisection to find failure boundaries. `--min-pass-rate` gates on the raw rate. There is no statistical testing in the code.
+- Metric drift is checked two-sided against absolute and relative tolerances (`src/simharness/ci.py`), so improvements are flagged too. Zero baselines disable the relative band. Metrics without a tolerance are skipped silently.
 - Terminal, JUnit XML, JSON and self-contained HTML outputs. Gazebo, AirSim and Isaac adapters exist but are described as untested.
 
 **Overlap:** baseline comparison, tolerances, JUnit and HTML output.
@@ -39,7 +43,7 @@ The two could be combined: RoboCI results could be converted into PhySim Gate ru
 [github.com/huggingface/lerobot](https://github.com/huggingface/lerobot)
 
 - Evaluates a policy in simulation (for example LIBERO and MetaWorld, or environments shared on the Hugging Face Hub) or on real hardware.
-- Writes `eval_info.json` with per-episode records (`episode_ix`, `sum_reward`, `max_reward`, `success`, `seed`) and aggregates (`avg_sum_reward`, `pc_success`, `n_episodes`, ...). The logs mention a 95% Wilson interval on the success rate (the computation itself was *unverified*).
+- Writes `eval_info.json` with per-episode records (`episode_ix`, `sum_reward`, `max_reward`, `success`, `seed`) and aggregates (`avg_sum_reward`, `pc_success`, `n_episodes`, ...), including a 95% Wilson interval on the success rate (`lerobot/utils/eval_stats.py`).
 - No baseline-versus-candidate comparison in the evaluation script.
 
 **Overlap:** none in the comparison step.
@@ -77,14 +81,30 @@ The two could be combined: RoboCI results could be converted into PhySim Gate ru
 
 | | Runs simulators | Baseline comparison | Uncertainty-aware | Explicit inconclusive outcome | Simulator-independent input | Plugin contract | Infrastructure needed |
 |---|---|---|---|---|---|---|---|
-| PhySim Gate | no | yes | yes (bootstrap of the difference) | yes | yes | entry points | none |
-| RoboCI | yes | yes (percentage threshold) | not described | not described | through its adapters | adapters | optional dashboard |
-| robot-sim-test-harness | yes (mock) | yes (tolerances) | not described | not described | through its adapters | simulator base class | none |
+| PhySim Gate | no | yes | yes (bootstrap or score interval of the difference) | yes | yes | entry points | none |
+| RoboCI | yes | yes (percentage threshold on one aggregate per run) | no (verified in code) | no | through its adapters | hardcoded registry | optional dashboard |
+| robot-sim-test-harness | yes (mock) | yes (absolute and relative tolerances) | no (verified in code) | no | through its adapters | `register()` registry | none |
 | LeRobot eval | yes | no | Wilson CI on success | n/a | n/a | n/a | none |
 | Scenic / VerifAI | through interfaces | no | n/a | n/a | n/a | simulator interfaces | none |
 | ros2_tracing | no | no | n/a | n/a | n/a | n/a | LTTng (Linux) |
 
-"Not described" means the public documentation did not mention it, not that it is absent.
+## Existing Python tools
+
+A robotics developer may already have tools that cover parts of this job.
+PhySim Gate does not replace them, and its statistics are not novel.
+
+| Tool | What it already does | What it does not do for this use case |
+|---|---|---|
+| `scipy.stats.bootstrap`, `permutation_test` | Paired and unpaired bootstrap (percentile, basic, BCa) and permutation tests | No run schema, margins, verdicts or CI outputs |
+| statsmodels | Non-inferiority tests (`ttost_paired`, `ttost_ind`, `tost_proportions_2indep`) and Newcombe or Wilson intervals | Same: a library of tests, not a gate |
+| rliable | Stratified bootstrap intervals, IQM and probability of improvement for multi-task, multi-seed RL evaluation | No pass/fail gate, I/O schema or missing-data rules |
+| asv, Bencher | Statistical regression detection for benchmarks (asv: Mann-Whitney U; Bencher: several threshold tests) with history | Built around timing benchmarks and their own harness or server |
+| pytest-regressions, pytest-benchmark, MLflow `MetricThreshold` | Point-value tolerances against stored baselines | No uncertainty |
+| Apache Otava (formerly Hunter), Evidently | Change-point detection over history; data drift tests | Different question (history or input drift, not a two-run non-inferiority decision) |
+
+PhySim Gate's statistics could be replaced by scipy or statsmodels calls with little change in behavior.
+The part that appears to be missing in the robotics ecosystem is narrower: a simulator-independent per-trial result schema with pairing keys, explicit rules for failed trials and missing values, a three-way verdict (regression, non-inferior, inconclusive) and CI-ready outputs in one small tool.
+Whether that gap is worth a separate project depends on adoption; it has not been tested with real users yet.
 
 ## Name check
 
