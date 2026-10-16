@@ -40,6 +40,7 @@ from physim_gate.schema import (
     Simulator,
     Trial,
     format_validation_error,
+    reject_duplicate_keys,
 )
 
 EVAL_INFO = "eval_info.json"
@@ -121,7 +122,7 @@ def _read(path: Path) -> dict[str, Any]:
         # lerobot-eval writes aggregates with json.dump, which emits NaN for empty groups.
         # Python's json module accepts that token, so per-episode NaN values are mapped to
         # missing values below instead of rejecting the whole file.
-        data = json.loads(text)
+        data = json.loads(text, object_pairs_hook=reject_duplicate_keys(str(path)))
     except json.JSONDecodeError as exc:
         raise SchemaError(f"{path}: invalid JSON at line {exc.lineno}: {exc.msg}") from exc
     if not isinstance(data, dict):

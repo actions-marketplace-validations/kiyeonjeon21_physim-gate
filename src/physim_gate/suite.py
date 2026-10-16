@@ -38,7 +38,7 @@ from physim_gate.adapters.base import AdapterError
 from physim_gate.comparison import ComparisonResult, ExitCode, Verdict
 from physim_gate.reporting.junit import render_junit
 from physim_gate.reporting.markdown import MARKER, NBSP, cell, code_span, render_markdown, sentence
-from physim_gate.schema import InputError, SchemaError, format_validation_error
+from physim_gate.schema import InputError, SchemaError, format_validation_error, load_yaml
 from physim_gate.store import is_reference
 
 SUITE_VERSION = 1
@@ -114,7 +114,7 @@ def load_suite(path: Path) -> list[ResolvedScenario]:
     except OSError as exc:
         raise InputError(f"{path}: cannot read file ({exc.strerror or exc})") from exc
     try:
-        data = yaml.safe_load(text)
+        data = load_yaml(text, str(path))
     except yaml.YAMLError as exc:
         raise SchemaError(f"{path}: invalid YAML: {exc}") from exc
     if not isinstance(data, dict):

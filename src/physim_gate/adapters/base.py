@@ -121,6 +121,23 @@ def get_adapter(name: str) -> Adapter:
     return adapter
 
 
+def load_with_adapter(name: str, source: Path, options: Mapping[str, str]) -> RunResult:
+    """Load ``source`` with the adapter registered as ``name``.
+
+    Adapters (and the policies the gymnasium adapter runs) are third-party code. One that calls
+    ``sys.exit()`` would otherwise end the process with its own exit code, for example 0, which
+    CI reads as "gate passed" although nothing was compared. That becomes an AdapterError.
+    """
+    adapter = get_adapter(name)
+    try:
+        return adapter.load(source, options)
+    except SystemExit as exc:
+        raise AdapterError(
+            f"adapter {name!r} called sys.exit({exc.code!r}) while loading {source}; "
+            "adapters must raise AdapterError or SchemaError instead"
+        ) from None
+
+
 def parse_options(pairs: list[str]) -> dict[str, str]:
     """Parse repeated ``key=value`` strings."""
     options: dict[str, str] = {}

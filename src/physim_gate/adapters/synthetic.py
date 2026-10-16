@@ -40,6 +40,7 @@ from physim_gate.schema import (
     Trial,
     TrialStatus,
     format_validation_error,
+    load_yaml,
 )
 
 GENERATOR_NAME = "physim-gate-synthetic"
@@ -174,7 +175,7 @@ def generate(spec: SyntheticSpec) -> RunResult:
 
 def load_spec(path: Path) -> SyntheticSpec:
     try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        data = load_yaml(path.read_text(encoding="utf-8"), str(path))
     except OSError as exc:
         raise InputError(f"{path}: cannot read file ({exc.strerror or exc})") from exc
     except yaml.YAMLError as exc:

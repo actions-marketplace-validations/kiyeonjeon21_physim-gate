@@ -327,7 +327,7 @@ def test_directory_inputs_are_hashed_not_crashed(
 
             return load_run(source / "run.json")
 
-    monkeypatch.setattr("physim_gate.cli.get_adapter", lambda _name: DirAdapter())
+    monkeypatch.setattr("physim_gate.adapters.base.get_adapter", lambda _name: DirAdapter())
     out = tmp_path / "comparison.json"
     args = [
         "compare",

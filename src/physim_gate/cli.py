@@ -20,7 +20,13 @@ from rich.table import Table
 from rich.text import Text
 
 from physim_gate import __version__
-from physim_gate.adapters.base import AdapterError, discover, get_adapter, parse_options
+from physim_gate.adapters.base import (
+    AdapterError,
+    discover,
+    get_adapter,
+    load_with_adapter,
+    parse_options,
+)
 from physim_gate.comparison import (
     ComparisonResult,
     ExitCode,
@@ -215,7 +221,7 @@ def _run_comparison(
 def _load(adapter_name: str, path: Path, options: dict[str, str]) -> RunResult:
     if not path.exists():
         raise InputError(f"{path}: no such file")
-    return get_adapter(adapter_name).load(path, options)
+    return load_with_adapter(adapter_name, path, options)
 
 
 def _write(path: Path, text: str) -> None:
@@ -358,7 +364,7 @@ def validate(
         if not results.exists():
             _fail(f"{results}: no such file")
         try:
-            run = get_adapter(adapter).load(results, options)
+            run = load_with_adapter(adapter, results, options)
         except InputError:
             raise
         except SchemaError as exc:

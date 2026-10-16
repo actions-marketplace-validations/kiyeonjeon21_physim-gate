@@ -362,21 +362,42 @@ def _collect_samples(
     b_values = baseline.metric_values(gate.name)
     c_values = candidate.metric_values(gate.name)
 
-    for label, values in (("baseline", b_values), ("candidate", c_values)):
+    b_keys, c_keys = set(b_values), set(c_values)
+    # When the runs share trial ids, they claim to cover the same set of conditions, so a
+    # trial that only one run reports is missing from the other. Otherwise a run could drop
+    # its crashed or bad trials and look better than one that reports them as null. Runs with
+    # disjoint ids are independent samples, and nothing can be said to be missing.
+    overlapping = bool(b_keys & c_keys)
+    if overlapping and gate.name == FAILURE_RATE_METRIC:
+        # A trial that a run left out did not complete in that run: count it as a failure.
+        # This keeps physim.failure_rate a working safeguard when max_missing_fraction is
+        # raised, which is the documented way to tolerate missing values.
+        b_values = {**b_values, **dict.fromkeys(c_keys - b_keys, 1.0)}
+        c_values = {**c_values, **dict.fromkeys(b_keys - c_keys, 1.0)}
+        b_keys, c_keys = set(b_values), set(c_values)
+    for label, values, absent in (
+        ("baseline", b_values, len(c_keys - b_keys) if overlapping else 0),
+        ("candidate", c_values, len(b_keys - c_keys) if overlapping else 0),
+    ):
         if not values:
             raise _Invalid(f"{label} run has no trials")
-        n_missing = sum(1 for v in values.values() if v is None)
-        fraction = n_missing / len(values)
+        n_null = sum(1 for v in values.values() if v is None)
+        n_missing = n_null + absent
+        expected = len(values) + absent
+        fraction = n_missing / expected
         if fraction > gate.max_missing_fraction:
+            other = "candidate" if label == "baseline" else "baseline"
+            detail = f"{n_null} null values"
+            if absent:
+                detail += f", {absent} trial ids reported only by the {other}"
             raise _Invalid(
-                f"{label}: value missing in {n_missing} of {len(values)} trials "
-                f"({fraction:.0%}), above max_missing_fraction "
-                f"({gate.max_missing_fraction:.0%}). Report values for failed trials too, or "
-                f"raise max_missing_fraction and gate {FAILURE_RATE_METRIC} so failures stay "
-                "visible"
+                f"{label}: {n_missing} of {expected} trials missing ({detail}; "
+                f"{fraction:.0%}), above max_missing_fraction "
+                f"({gate.max_missing_fraction:.0%}). Report every trial, with values for failed "
+                f"trials too, or raise max_missing_fraction and gate {FAILURE_RATE_METRIC} so "
+                "failures stay visible"
             )
 
-    b_keys, c_keys = set(b_values), set(c_values)
     if gate.pairing is Pairing.UNPAIRED:
         mode, note = "unpaired", None
     elif gate.pairing is Pairing.PAIRED:

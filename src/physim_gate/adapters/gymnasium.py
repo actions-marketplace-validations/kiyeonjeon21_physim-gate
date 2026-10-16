@@ -44,6 +44,7 @@ from physim_gate.schema import (
     Trial,
     TrialStatus,
     format_validation_error,
+    load_yaml,
 )
 
 Policy = Callable[[Any], Any]
@@ -198,7 +199,7 @@ class GymnasiumAdapter:
     def load(self, source: Path, options: Mapping[str, str]) -> RunResult:
         reject_unknown_options(self.name, options, {"run_id", "policy", "episodes"})
         try:
-            data = yaml.safe_load(source.read_text(encoding="utf-8"))
+            data = load_yaml(source.read_text(encoding="utf-8"), str(source))
         except OSError as exc:
             raise InputError(f"{source}: cannot read file ({exc.strerror or exc})") from exc
         except yaml.YAMLError as exc:

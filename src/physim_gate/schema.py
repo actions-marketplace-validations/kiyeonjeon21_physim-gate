@@ -10,14 +10,17 @@ purposes, while ``0.0`` is always a valid observation. Non-finite numbers are re
 
 from __future__ import annotations
 
+import io
 import json
 import math
 import re
+from collections.abc import Callable
 from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Annotated, Any, Self
 
+import yaml
 from pydantic import (
     AfterValidator,
     BaseModel,
@@ -276,16 +279,83 @@ def format_validation_error(error: ValidationError) -> list[str]:
     return problems
 
 
+def reject_duplicate_keys(origin: str) -> Callable[[list[tuple[str, Any]]], dict[str, Any]]:
+    """A ``json`` ``object_pairs_hook`` that rejects objects with a repeated key.
+
+    Python's ``json`` keeps the last value of a repeated key, so a second ``"err"`` entry could
+    silently replace a metric's declaration. Repeated keys are always an error here.
+    """
+
+    def hook(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in result:
+                raise SchemaError(f"{origin}: duplicate key {key!r}")
+            result[key] = value
+        return result
+
+    return hook
+
+
 def parse_json_text(text: str, origin: str) -> Any:
-    """Parse JSON, rejecting the non-standard ``NaN``/``Infinity`` tokens Python accepts."""
+    """Parse JSON, rejecting repeated keys and the non-standard ``NaN``/``Infinity`` tokens."""
 
     def _reject_constant(token: str) -> Any:
         raise SchemaError(f"{origin}: non-finite number {token!r} is not valid JSON")
 
     try:
-        return json.loads(text, parse_constant=_reject_constant)
+        return json.loads(
+            text,
+            parse_constant=_reject_constant,
+            object_pairs_hook=reject_duplicate_keys(origin),
+        )
     except json.JSONDecodeError as exc:
         raise SchemaError(f"{origin}: invalid JSON at line {exc.lineno}: {exc.msg}") from exc
+
+
+class _StrictYamlLoader(yaml.SafeLoader):
+    """``yaml.SafeLoader`` that rejects mappings with a repeated key.
+
+    PyYAML keeps the last value of a repeated key, so a second ``err:`` entry in a gate config
+    could silently loosen a threshold. YAML 1.2 forbids repeated keys. Merge keys (``<<``)
+    keep their usual override semantics.
+    """
+
+
+def _construct_strict_mapping(loader: yaml.SafeLoader, node: yaml.MappingNode) -> Any:
+    seen: set[Any] = set()
+    for key_node, _ in node.value:
+        if key_node.tag == "tag:yaml.org,2002:merge":
+            continue
+        key = loader.construct_object(key_node, deep=True)
+        try:
+            duplicate = key in seen
+            seen.add(key)
+        except TypeError:  # unhashable key; construct_mapping reports it
+            continue
+        if duplicate:
+            raise yaml.constructor.ConstructorError(
+                "while constructing a mapping",
+                node.start_mark,
+                f"found duplicate key {key!r}",
+                key_node.start_mark,
+            )
+    return loader.construct_mapping(node, deep=True)
+
+
+_StrictYamlLoader.add_constructor(
+    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _construct_strict_mapping
+)
+
+
+def load_yaml(text: str, origin: str = "<yaml>") -> Any:
+    """``yaml.safe_load`` that also rejects repeated keys (raises ``yaml.YAMLError``).
+
+    ``origin`` names the document in error messages instead of ``<unicode string>``.
+    """
+    stream = io.StringIO(text)
+    stream.name = origin
+    return yaml.load(stream, Loader=_StrictYamlLoader)
 
 
 def run_from_data(data: Any, origin: str = "<data>") -> RunResult:

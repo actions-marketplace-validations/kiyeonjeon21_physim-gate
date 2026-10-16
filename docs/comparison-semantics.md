@@ -44,12 +44,17 @@ An absent key and an explicit `null` are both *missing*.
 The default is strict on purpose: if crashed trials simply dropped out, a policy that crashes more could look better.
 To tolerate missing values, raise `max_missing_fraction` and gate `physim.failure_rate` so failures stay visible.
 
+**Missing trials.** When the two runs share some `trial_id`s, they claim to cover the same conditions, so a trial that only one run reports counts as a missing value of the other run, exactly like an explicit `null`.
+In v0.3.0 and earlier such trials were simply left out, so a candidate that omitted its crashed trials could pass where reporting them would have made the metric `INVALID`.
+Runs whose `trial_id`s do not overlap at all are independent samples; nothing is considered missing then.
+For `physim.failure_rate`, such a trial counts as a failure (1) of the run that left it out, so gating the failure rate keeps omitted trials visible even when `max_missing_fraction` is raised.
+
 **Pairing.** `pairing` controls whether trials are matched by `trial_id`:
 
 | `pairing` | Behavior |
 |---|---|
 | `auto` (default) | Paired if both runs have exactly the same set of `trial_id`s. Otherwise unpaired, with a note |
-| `paired` | Paired on the `trial_id`s present in both runs. Unmatched trials are excluded and listed. `INVALID` if no ids overlap |
+| `paired` | Paired on the `trial_id`s present in both runs. Unmatched trials count as missing (see above); if `max_missing_fraction` allows them, they are excluded and listed. `INVALID` if no ids overlap |
 | `unpaired` | Two independent samples |
 
 In paired mode, a pair is used only if both values are present.

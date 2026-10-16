@@ -24,6 +24,7 @@ class Adapter(Protocol):
 - `options` are the `-O key=value` pairs from the command line. Reject unknown keys so typos surface.
 - Return a `RunResult`. The easiest way is `physim_gate.schema.run_from_data(dict, origin)`, which validates and produces readable errors.
 - Raise `physim_gate.adapters.AdapterError` or `physim_gate.schema.SchemaError` for problems the user can fix. The CLI prints the message and exits with code 2.
+- Never call `sys.exit()`. An adapter that does is reported as an error (exit code 2); in v0.3.0 and earlier, `sys.exit(0)` ended the process with exit code 0, which CI reads as a passing gate.
 
 ## Registration
 

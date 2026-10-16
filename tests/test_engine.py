@@ -238,7 +238,13 @@ def test_auto_falls_back_to_unpaired_when_ids_differ() -> None:
 
 
 def test_unpaired_samples_may_have_different_sizes() -> None:
-    metric, _ = compare(ramp(10, n=40), ramp(10, n=25), config=gate(max_absolute_degradation=1))
+    # Distinct trial ids: independent samples, so neither run is missing anything.
+    metric, _ = compare(
+        ramp(10, n=40),
+        ramp(10, n=25),
+        cand_ids=[f"other{i}" for i in range(25)],
+        config=gate(max_absolute_degradation=1),
+    )
     assert metric.pairing.mode == "unpaired"
     assert (metric.baseline.n, metric.candidate.n) == (40, 25)
     assert metric.verdict is Verdict.PASS
@@ -247,7 +253,8 @@ def test_unpaired_samples_may_have_different_sizes() -> None:
 def test_explicit_pairing_uses_intersection_and_reports_unmatched() -> None:
     ids_b = [f"t{i}" for i in range(N)]
     ids_c = [f"t{i}" for i in range(5, N + 5)]
-    config = gate(max_absolute_degradation=1, pairing="paired")
+    # Each run lacks 5 of the other's ids; allow that explicitly.
+    config = gate(max_absolute_degradation=1, pairing="paired", max_missing_fraction=0.2)
     metric, _ = compare(ramp(10), ramp(10), base_ids=ids_b, cand_ids=ids_c, config=config)
     assert metric.pairing.mode == "paired"
     assert metric.pairing.n_pairs == N - 5
@@ -277,7 +284,7 @@ def test_missing_values_are_invalid_by_default() -> None:
     metric, result = compare(ramp(10), cand)
     assert metric.verdict is Verdict.INVALID
     assert metric.direction is not None  # identity is still reported
-    assert "missing in 1 of 40" in metric.reasons[0]
+    assert "1 of 40 trials missing (1 null values" in metric.reasons[0]
     assert result.exit_code == 3
 
 

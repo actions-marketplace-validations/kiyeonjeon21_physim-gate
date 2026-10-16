@@ -82,7 +82,9 @@ This distinction is central to sound comparisons:
 | `x` absent | The metric was not reported for this trial |
 
 Both `null` and absent count as missing during comparison.
+So does a whole trial that the other run reports but this one leaves out, when the runs share `trial_id`s.
 Missing values make a gated metric `INVALID` unless `max_missing_fraction` allows them (see [comparison semantics](comparison-semantics.md)).
+Report every trial you ran, including crashed ones, with `status` set and `null` where a value is unavailable.
 `physim-gate validate` reports how many values are missing per metric.
 
 ## Numbers
@@ -90,6 +92,11 @@ Missing values make a gated metric `INVALID` unless `max_missing_fraction` allow
 Metric values must be finite JSON numbers.
 `NaN`, `Infinity` and `-Infinity` are rejected, including the non-standard tokens that Python's `json` module would otherwise accept.
 Booleans and numeric strings are rejected; encode a success flag as `0` or `1`.
+
+## Repeated keys
+
+A JSON object or YAML mapping that repeats a key is rejected, in run results, comparison results, gate configs, suite files and LeRobot output alike.
+Python's parsers would otherwise keep the last value silently, so a second entry for a metric or a scenario could change a verdict without anyone noticing.
 
 ## Derived metric: `physim.failure_rate`
 
