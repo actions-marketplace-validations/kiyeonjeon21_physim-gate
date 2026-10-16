@@ -66,9 +66,13 @@ def test_compare_writes_all_outputs_and_report_round_trips(tmp_path: Path) -> No
             str(out / "junit.xml"),
             "--html",
             str(out / "report.html"),
+            "--markdown",
+            str(out / "summary.md"),
         ),
     )
     assert result.exit_code == 1
+    assert "summary.md" in result.output
+    assert (out / "summary.md").read_text().startswith("<!-- physim-gate -->\n### ❌")
     comparison = json.loads((out / "comparison.json").read_text())
     assert comparison["kind"] == "physim-gate.comparison"
     assert comparison["inputs"]["baseline"]["sha256"]
@@ -90,6 +94,36 @@ def test_compare_json_format_is_machine_readable(tmp_path: Path) -> None:
     data = json.loads(result.stdout)
     assert data["verdict"] == "PASS"
     assert data["exit_code"] == 0
+
+
+def test_markdown_format_on_stdout(tmp_path: Path) -> None:
+    paths = materialize(tmp_path, "insufficient_evidence")
+    saved = str(tmp_path / "c.json")
+    result = runner.invoke(app, compare_args(paths, "--format", "markdown", "-o", saved))
+    assert result.exit_code == 3
+    assert result.stdout.startswith("<!-- physim-gate -->\n### ⚠️ PhySim Gate: INCONCLUSIVE")
+    assert "wrote" not in result.stdout
+    report = runner.invoke(app, ["report", saved, "-f", "markdown"])
+    assert report.exit_code == 3
+    assert report.stdout == result.stdout
+    # Formats that only make sense for comparison results are not offered elsewhere.
+    assert runner.invoke(app, ["adapters", "-f", "markdown"]).exit_code == 2
+
+
+def test_compare_with_lerobot_adapter(tmp_path: Path) -> None:
+    real = Path(__file__).parent / "data" / "lerobot" / "pusht_act_4_episodes.json"
+    gate = tmp_path / "gate.yaml"
+    gate.write_text(
+        "version: 1\ndefaults: {min_samples: 2}\n"
+        "metrics: {success: {max_absolute_degradation: 0.9}, sum_reward: "
+        "{max_relative_degradation: 0.5}}\n"
+    )
+    args = ["-a", "lerobot", "-O", "start_seed=1000", "-g", str(gate), "-f", "json"]
+    result = runner.invoke(app, ["compare", "-b", str(real), "-c", str(real), *args])
+    data = json.loads(result.stdout)
+    assert [m["pairing"]["mode"] for m in data["metrics"]] == ["paired", "paired"]
+    assert data["baseline"]["seeds"] == [1000, 1001, 1002, 1003]
+    assert data["inputs"]["adapter"] == "lerobot"
 
 
 def test_compare_usage_errors_exit_2(tmp_path: Path) -> None:
@@ -218,7 +252,7 @@ def test_adapters_and_schema_and_version() -> None:
     assert "json" in listed.output
     assert "synthetic" in listed.output
     as_json = json.loads(runner.invoke(app, ["adapters", "--format", "json"]).stdout)
-    assert {a["name"] for a in as_json} >= {"json", "synthetic", "gymnasium"}
+    assert {a["name"] for a in as_json} >= {"json", "synthetic", "gymnasium", "lerobot"}
     for kind in ("run", "comparison", "config"):
         schema = runner.invoke(app, ["schema", kind])
         assert schema.exit_code == 0

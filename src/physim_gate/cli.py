@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import os
 import sys
@@ -24,13 +25,16 @@ from physim_gate.comparison import (
     ExitCode,
     InputRef,
     Inputs,
+    Verdict,
     load_comparison,
 )
 from physim_gate.config import GateConfig, load_config
 from physim_gate.engine import compare_runs
+from physim_gate.planning import Plan, PlanningError, plan_binary, plan_continuous
 from physim_gate.provenance import sha256_path
 from physim_gate.reporting.html import render_html
 from physim_gate.reporting.junit import render_junit
+from physim_gate.reporting.markdown import render_markdown
 from physim_gate.reporting.terminal import VERDICT_STYLE, make_console, print_comparison
 from physim_gate.schema import (
     FAILURE_RATE_METRIC,
@@ -70,6 +74,12 @@ err = make_console(stderr=True)
 class OutputFormat(StrEnum):
     TEXT = "text"
     JSON = "json"
+
+
+class ReportFormat(StrEnum):
+    TEXT = "text"
+    JSON = "json"
+    MARKDOWN = "markdown"
 
 
 class SchemaKind(StrEnum):
@@ -129,6 +139,13 @@ AdapterOptionsOpt = Annotated[
     typer.Option("--adapter-option", "-O", help="Adapter option as key=value. Repeatable."),
 ]
 FormatOpt = Annotated[OutputFormat, typer.Option("--format", "-f", help="Output format on stdout.")]
+ReportFormatOpt = Annotated[
+    ReportFormat, typer.Option("--format", "-f", help="Output format on stdout.")
+]
+MarkdownOpt = Annotated[
+    Path | None,
+    typer.Option("--markdown", help="Write a Markdown summary here (for PR comments)."),
+]
 
 
 def _load(adapter_name: str, path: Path, options: dict[str, str]) -> RunResult:
@@ -155,9 +172,10 @@ def compare(
     ] = None,
     junit: Annotated[Path | None, typer.Option("--junit", help="Write JUnit XML here.")] = None,
     html: Annotated[Path | None, typer.Option("--html", help="Write the HTML report here.")] = None,
+    markdown: MarkdownOpt = None,
     adapter: AdapterOpt = "json",
     adapter_option: AdapterOptionsOpt = None,
-    output_format: FormatOpt = OutputFormat.TEXT,
+    output_format: ReportFormatOpt = ReportFormat.TEXT,
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Explain passing metrics too.")
     ] = False,
@@ -180,6 +198,7 @@ def compare(
             output=output,
             junit=junit,
             html=html,
+            markdown=markdown,
             output_format=output_format,
             verbose=verbose,
         )
@@ -192,7 +211,8 @@ def _emit(
     output: Path | None,
     junit: Path | None,
     html: Path | None,
-    output_format: OutputFormat,
+    markdown: Path | None,
+    output_format: ReportFormat,
     verbose: bool,
 ) -> None:
     if output is not None:
@@ -201,12 +221,17 @@ def _emit(
         _write(junit, render_junit(result))
     if html is not None:
         _write(html, render_html(result))
+    if markdown is not None:
+        _write(markdown, render_markdown(result))
     with _tolerate_closed_stdout():
-        if output_format is OutputFormat.JSON:
+        if output_format is ReportFormat.JSON:
             typer.echo(dump_json(result), nl=False)
             return
+        if output_format is ReportFormat.MARKDOWN:
+            typer.echo(render_markdown(result), nl=False)
+            return
         print_comparison(result, out, verbose=verbose)
-        written = [str(p) for p in (output, junit, html) if p is not None]
+        written = [str(p) for p in (output, junit, html, markdown) if p is not None]
         if written:
             out.print(Text(f"wrote {', '.join(written)}", style="dim"))
 
@@ -234,7 +259,8 @@ def report(
     ],
     html: Annotated[Path | None, typer.Option("--html", help="Write the HTML report here.")] = None,
     junit: Annotated[Path | None, typer.Option("--junit", help="Write JUnit XML here.")] = None,
-    output_format: FormatOpt = OutputFormat.TEXT,
+    markdown: MarkdownOpt = None,
+    output_format: ReportFormatOpt = ReportFormat.TEXT,
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Explain passing metrics too.")
     ] = False,
@@ -247,6 +273,7 @@ def report(
             output=None,
             junit=junit,
             html=html,
+            markdown=markdown,
             output_format=output_format,
             verbose=verbose,
         )
@@ -389,6 +416,152 @@ def init(
         + Text(str(path))
         + Text(" - review each margin before gating on it", style="dim")
     )
+
+
+def _percent(value: float) -> str:
+    if 0 < value < 0.001:
+        return "<0.1%"
+    if 0.999 < value < 1:
+        return ">99.9%"
+    return f"{value * 100:.1f}%"
+
+
+def _print_plan(plan: Plan, rate: float | None, direction: Direction) -> None:
+    rows: list[tuple[str, str]] = []
+    if plan.kind == "binary" and rate is not None:
+        bad = direction is Direction.LOWER_IS_BETTER
+        candidate = rate + plan.true_degradation if bad else rate - plan.true_degradation
+        what = "0/1 metric, " + ("lower is better" if bad else "higher is better")
+        rows += [("baseline rate", f"{rate:g}"), ("candidate rate", f"{candidate:g}")]
+    else:
+        what = "continuous metric"
+    rows += [
+        ("true degradation", f"{plan.true_degradation:g}"),
+        ("margin", f"{plan.margin:g}"),
+        (
+            "goal",
+            f"{plan.goal.value.upper()} with probability >= {plan.power:.0%}, "
+            f"{plan.confidence:.0%} intervals",
+        ),
+        ("method", plan.method),
+    ]
+    out.print(Text(f"plan for a {what}", style="bold"))
+    for label, value in rows:
+        out.print(Text(f"  {label:<18}", style="dim") + Text(value))
+    out.print()
+    if plan.trials is None:
+        out.print(
+            Text(f"  more than {plan.max_trials:,} trials per run", style="bold yellow")
+            + Text(" - widen the margin or accept INCONCLUSIVE verdicts", style="dim")
+        )
+    else:
+        out.print(Text(f"  {plan.trials:,} trials per run", style="bold"))
+    if plan.probabilities is not None:
+        p = plan.probabilities
+        line = Text("  verdicts at that size: ", style="dim")
+        line.append(f"PASS {_percent(p.pass_)}", style=VERDICT_STYLE[Verdict.PASS])
+        line.append("  ")
+        line.append(
+            f"INCONCLUSIVE {_percent(p.inconclusive)}", style=VERDICT_STYLE[Verdict.INCONCLUSIVE]
+        )
+        line.append("  ")
+        line.append(f"FAIL {_percent(p.fail)}", style=VERDICT_STYLE[Verdict.FAIL])
+        out.print(line)
+    out.print()
+    for note in plan.notes:
+        out.print(Text(f"  note: {note}", style="dim"))
+
+
+@app.command(epilog=EXIT_CODES_HELP)
+def plan(
+    margin: Annotated[
+        float,
+        typer.Option(
+            "--margin", "-m", help="Allowed degradation, in the metric's unit (absolute)."
+        ),
+    ],
+    rate: Annotated[
+        float | None,
+        typer.Option("--rate", "-r", help="0/1 metric: expected baseline rate of 1s (0-1)."),
+    ] = None,
+    stdev: Annotated[
+        float | None,
+        typer.Option(
+            "--stdev",
+            "-s",
+            help="Continuous metric: standard deviation of one trial's value "
+            "(of the paired differences with --paired).",
+        ),
+    ] = None,
+    direction: Annotated[
+        Direction,
+        typer.Option(
+            "--direction",
+            "-d",
+            metavar="DIRECTION",
+            help="0/1 metric: higher_is_better (a success rate) or lower_is_better "
+            "(a collision rate).",
+        ),
+    ] = Direction.HIGHER_IS_BETTER,
+    true_degradation: Annotated[
+        float,
+        typer.Option(
+            "--true-degradation",
+            "-t",
+            help="Degradation you expect the candidate to really have. Below the margin the "
+            "goal is PASS, above it FAIL.",
+        ),
+    ] = 0.0,
+    paired: Annotated[
+        bool, typer.Option("--paired", help="Continuous metric: runs share trial conditions.")
+    ] = False,
+    confidence: Annotated[float, typer.Option("--confidence", help="Interval level.")] = 0.95,
+    power: Annotated[
+        float, typer.Option("--power", help="Wanted probability of the goal verdict.")
+    ] = 0.8,
+    min_samples: Annotated[int, typer.Option("--min-samples", help="The gate's min_samples.")] = 10,
+    output_format: FormatOpt = OutputFormat.TEXT,
+) -> None:
+    """Estimate how many trials per run a metric needs to reach a verdict."""
+    if (rate is None) == (stdev is None):
+        _fail("give exactly one of --rate (0/1 metric) or --stdev (continuous metric)")
+    try:
+        if rate is not None:
+            if paired:
+                _fail("--paired applies to --stdev only; the 0/1 plan is exact for unpaired runs")
+            result = plan_binary(
+                rate,
+                margin,
+                direction=direction,
+                true_degradation=true_degradation,
+                confidence=confidence,
+                power=power,
+                min_samples=min_samples,
+            )
+        else:
+            assert stdev is not None
+            result = plan_continuous(
+                stdev,
+                margin,
+                paired=paired,
+                true_degradation=true_degradation,
+                confidence=confidence,
+                power=power,
+                min_samples=min_samples,
+            )
+    except PlanningError as exc:
+        _fail(str(exc))
+    if output_format is OutputFormat.JSON:
+        document = dataclasses.asdict(result)
+        if result.probabilities is not None:
+            document["probabilities"] = {
+                "pass": result.probabilities.pass_,
+                "inconclusive": result.probabilities.inconclusive,
+                "fail": result.probabilities.fail,
+            }
+        typer.echo(json.dumps(document, indent=2))
+        return
+    _print_plan(result, rate, direction)
 
 
 @app.command()

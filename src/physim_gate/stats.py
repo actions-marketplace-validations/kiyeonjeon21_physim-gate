@@ -160,9 +160,6 @@ def newcombe_difference(
     z = statistics.NormalDist().inv_cdf(1 - (1 - confidence) / 2)
     nb, nc = len(baseline), len(candidate)
     xb, xc = round(sum(baseline)), round(sum(candidate))
-    pb, pc = xb / nb, xc / nc
-    lb, ub = wilson_interval(xb, nb, z)
-    lc, uc = wilson_interval(xc, nc, z)
 
     phi = 0.0
     if paired:
@@ -179,6 +176,21 @@ def newcombe_difference(
                 cross = max(cross - nb / 2, 0.0)
             phi = cross / denominator
 
+    return _newcombe_combine(xb, nb, xc, nc, z, phi)
+
+
+def newcombe_counts(xb: int, nb: int, xc: int, nc: int, confidence: float) -> Interval:
+    """Unpaired Newcombe hybrid score interval from event counts (see newcombe_difference)."""
+    if nb <= 0 or nc <= 0:
+        raise ValueError("newcombe_counts needs nb > 0 and nc > 0")
+    z = statistics.NormalDist().inv_cdf(1 - (1 - confidence) / 2)
+    return _newcombe_combine(xb, nb, xc, nc, z, 0.0)
+
+
+def _newcombe_combine(xb: int, nb: int, xc: int, nc: int, z: float, phi: float) -> Interval:
+    pb, pc = xb / nb, xc / nc
+    lb, ub = wilson_interval(xb, nb, z)
+    lc, uc = wilson_interval(xc, nc, z)
     difference = pc - pb
     lower_sq = (pc - lc) ** 2 - 2 * phi * (pc - lc) * (ub - pb) + (ub - pb) ** 2
     upper_sq = (uc - pc) ** 2 - 2 * phi * (uc - pc) * (pb - lb) + (pb - lb) ** 2

@@ -8,7 +8,8 @@ from rich.console import Console
 
 from physim_gate.comparison import ComparisonResult, comparison_from_data
 from physim_gate.engine import compare_runs
-from physim_gate.reporting import print_comparison, render_html, render_junit
+from physim_gate.reporting import print_comparison, render_html, render_junit, render_markdown
+from physim_gate.reporting.markdown import MARKER
 from physim_gate.schema import SchemaError
 from tests.conftest import make_config, make_run
 
@@ -89,6 +90,47 @@ def test_html_is_self_contained_and_escaped() -> None:
     assert "paired bootstrap, 10000 resamples" in html
 
 
+def test_markdown_summary() -> None:
+    text = render_markdown(result())
+    assert text.startswith(MARKER + "\n### ❌ PhySim Gate: FAIL\n")
+    rows = [line for line in text.splitlines() if line.startswith("| `")]
+    assert len(rows) == 4
+    assert rows[0].startswith("| `speed` ↑ (m/s) | 2 | 0 | +2 |")
+    assert rows[0].endswith("| 30 pairs | ❌ FAIL |")
+    assert rows[1].endswith("⚠️ INCONCLUSIVE (non-blocking) |") or "(non-blocking)" in rows[1]
+    assert "`gone`" in rows[3]
+    assert rows[3].endswith("| ⛔ INVALID |")
+    # Untrusted strings only appear inside code spans, which GitHub renders literally.
+    assert "`cand <script>`" in text
+    assert "<script>" not in text.replace("`cand <script>`", "")
+    assert "<details><summary>" in text
+    assert "**speed**: ❌ FAIL" in text
+    assert "speed**: ✅" not in text
+
+
+def test_markdown_escapes_table_breaking_names() -> None:
+    values = [float(i % 5) for i in range(N)]
+    base = make_run({"m": values}, run_id="x|y`z", units={"m": "a|b"})
+    cand = make_run({"m": values}, run_id="c", units={"m": "a|b"})
+    text = render_markdown(
+        compare_runs(base, cand, make_config({"m": {"max_absolute_degradation": 1}}))
+    )
+    assert "`x\\|y'z`" in text
+    row = next(line for line in text.splitlines() if line.startswith("| `m`"))
+    assert row.startswith("| `m` ↑ (a\\|b) |")
+    assert row.replace("\\|", "").count("|") == 9
+
+
+def test_markdown_degrades_to_fit_comment_limits() -> None:
+    full = render_markdown(result())
+    without_reasons = render_markdown(result(), max_chars=len(full) - 1)
+    assert "<details>" not in without_reasons
+    assert without_reasons.count("| `") == 4
+    folded = render_markdown(result(), max_chars=100)
+    assert "<details>" not in folded
+    assert "passing metric(s) not listed" not in folded  # no metric passed in this result
+
+
 def test_terminal_table_and_narrow_layout() -> None:
     wide = Console(width=140, record=True, color_system=None)
     print_comparison(result(), wide)
@@ -135,3 +177,23 @@ def test_run_level_issues_are_reported_everywhere() -> None:
     html = render_html(result)
     assert "Run notes" in html
     assert "scenario differs" in html
+
+    markdown = render_markdown(result)
+    assert "**Run notes**" in markdown
+    assert "- **blocking:** scenario differs" in markdown
+    assert "- candidate run status is 'partial'" in markdown
+
+
+def test_markdown_folds_passing_metrics_last() -> None:
+    values = [float(i % 5) for i in range(N)]
+    base = make_run({"m": values, "k": values}, run_id="b")
+    cand = make_run({"m": values, "k": [None] * N}, run_id="c")
+    result = compare_runs(
+        base,
+        cand,
+        make_config({"m": {"max_absolute_degradation": 1}, "k": {"max_absolute_degradation": 1}}),
+    )
+    folded = render_markdown(result, max_chars=100)
+    assert "1 passing metric(s) not listed; see the HTML report." in folded
+    assert "| `k`" in folded
+    assert "| `m`" not in folded

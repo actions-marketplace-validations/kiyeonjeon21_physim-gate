@@ -199,6 +199,41 @@ What this shows:
 - The score intervals for 0/1 metrics stay near or below nominal. For rare events they are conservative, which means many `INCONCLUSIVE` results unless there are hundreds of trials.
 - The Monte Carlo uncertainty of each percentage is roughly plus or minus 1 point.
 
+## Planning the number of trials
+
+`physim-gate plan` estimates how many trials per run make the intended verdict likely.
+You state the margin, what you expect the true degradation to be (default 0), the wanted probability of the intended verdict (`--power`, default 0.8) and the interval level (`--confidence`, default 0.95).
+If the expected degradation is below the margin the intended verdict is `PASS`, and if it is above, `FAIL`.
+Exactly at the margin neither verdict is expected, and the command says so.
+
+For 0/1 metrics (`--rate`), the probabilities are exact for unpaired runs.
+For every pair of event counts the planner computes the engine's unpaired Newcombe interval, decides the verdict, and weights it by the binomial probability of that pair.
+The interval's bounds rise with the candidate's count and fall with the baseline's, so for each baseline count the decisive candidate counts are found with one sweep instead of a full search.
+Tests compare the result with brute-force enumeration (agreement within 1e-12) and with the engine itself on simulated runs.
+The Monte Carlo study above found `FAIL` in 11.4% of runs for "collision 0.01 to 0.06, unpaired, 80 trials"; the exact probability is 11.1%.
+
+Runs that share trial conditions are compared as pairs, which usually narrows the interval, so for paired runs the unpaired answer is normally an upper bound.
+Power for 0/1 data rises unevenly with the number of trials, so a few trials more than the reported number add a little safety.
+
+For continuous metrics (`--stdev`), the planner uses the normal approximation
+
+```text
+n = ((z_c + z_p) * sd_diff / |margin - degradation|)^2
+```
+
+where `z_c` is the normal quantile for the interval level, `z_p` the one for the power, and `sd_diff` the standard deviation of the per-trial difference: the given `--stdev` with `--paired`, otherwise `--stdev` times the square root of 2.
+The engine's bootstrap does not follow this formula exactly, and below about 30 trials its intervals are too narrow (see the table above), so treat small answers with care.
+
+Some reference points at the defaults (confidence 0.95, power 0.8, unpaired):
+
+| Metric | Expected | Margin | Trials per run |
+|---|---|---|---|
+| Success rate 0.90 | unchanged | 0.05 | 573 |
+| Success rate 0.98 | unchanged | 0.02 | 843 |
+| Success rate 0.50 | unchanged | 0.05 | 1,579 |
+| Collision rate 0.02 | rises to 0.05 | 0.01 | 1,280 (to `FAIL`) |
+| Continuous, stdev 2.0 | unchanged | 0.5 | 252 (126 if paired with stdev of differences 2.0) |
+
 ## Limitations
 
 - Percentile bootstrap intervals undercover with small samples and skewed distributions (see the table above). `min_samples` is a floor, not a guarantee of accuracy. Gating a 1% event rate with confidence needs hundreds or thousands of trials.

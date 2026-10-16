@@ -8,7 +8,8 @@ native output ─────────> RunResult ─┐
                                     ├─> compare_runs() ─> ComparisonResult ─┬─> terminal
 native output ─────────> RunResult ─┘        ^                              ├─> JSON
                                              │                              ├─> JUnit XML
-                           gate.yaml ─> GateConfig                          └─> HTML
+                           gate.yaml ─> GateConfig                          ├─> Markdown
+                                                                            └─> HTML
 ```
 
 Every arrow is a typed, validated, versioned object.
@@ -24,9 +25,10 @@ Each stage can be used alone from Python, and the CLI is a thin layer over them.
 | `stats.py` | Dependency-free point estimates, quantiles, the paired/unpaired bootstrap, and Wilson/Newcombe score intervals for 0/1 metrics |
 | `engine.py` | `compare_runs()`: run-level checks, per-metric numerical, evidence and policy layers |
 | `comparison.py` | The versioned `ComparisonResult` models, verdict vocabulary and exit codes |
+| `planning.py` | `physim-gate plan`: trials needed for a verdict, exact for 0/1 metrics |
 | `provenance.py` | Environment capture, git provenance, file hashes, `SOURCE_DATE_EPOCH` |
-| `adapters/` | The adapter protocol, entry-point discovery, and the `json`, `synthetic` and `gymnasium` adapters |
-| `reporting/` | Terminal (rich), JUnit XML and self-contained HTML renderers |
+| `adapters/` | The adapter protocol, entry-point discovery, and the `json`, `synthetic`, `gymnasium` and `lerobot` adapters |
+| `reporting/` | Terminal (rich), JUnit XML, Markdown and self-contained HTML renderers |
 | `demo.py`, `fixtures/` | The bundled scenarios and the `demo` command |
 | `cli.py` | The Typer CLI, error handling and exit codes |
 
