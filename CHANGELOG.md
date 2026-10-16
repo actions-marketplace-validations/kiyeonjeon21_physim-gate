@@ -14,6 +14,7 @@ This file is generated from the commit history by git-cliff.
 
 - **cli:** Never wrap the paths of written reports
 - **report:** Start the Markdown summary sentence with a capital letter
+- **examples:** Allow physim-gate 0.2 in the CSV adapter example
 
 ### Documentation
 
