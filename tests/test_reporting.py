@@ -199,3 +199,12 @@ def test_markdown_folds_passing_metrics_last() -> None:
     assert "1 passing metric(s) not listed; see the HTML report." in folded
     assert "| `k`" in folded
     assert "| `m`" not in folded
+
+
+def test_terminal_output_is_never_truncated() -> None:
+    """At any width the table either fits or is replaced by blocks; nothing is cut with '…'."""
+    comparison = result()
+    for width in range(60, 201, 5):
+        console = Console(width=width, record=True, color_system=None)
+        print_comparison(comparison, console)
+        assert "…" not in console.export_text(), width

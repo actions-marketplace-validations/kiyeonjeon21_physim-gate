@@ -6,6 +6,7 @@ import os
 import sys
 
 from rich.console import Console
+from rich.measure import Measurement
 from rich.padding import Padding
 from rich.table import Table
 from rich.text import Text
@@ -19,9 +20,6 @@ VERDICT_STYLE = {
     Verdict.INCONCLUSIVE: "bold yellow",
     Verdict.INVALID: "bold magenta",
 }
-
-#: Below this width the metric table is replaced by one block per metric.
-_TABLE_MIN_WIDTH = 100
 
 
 class _Console(Console):
@@ -136,6 +134,7 @@ def _blocks(console: Console, result: ComparisonResult) -> None:
                         style="dim",
                     ),
                     (0, 0, 0, 2),
+                    expand=False,
                 )
             )
         if m.evidence.degradation_ci is not None:
@@ -146,6 +145,7 @@ def _blocks(console: Console, result: ComparisonResult) -> None:
                         style="dim",
                     ),
                     (0, 0, 0, 2),
+                    expand=False,
                 )
             )
 
@@ -171,8 +171,12 @@ def print_comparison(
     console.print(_run_line("candidate", result.candidate))
     console.print()
 
-    if console.width >= _TABLE_MIN_WIDTH:
-        console.print(_table(result))
+    table = _table(result)
+    # Measure without the console's width limit: a table that would need truncating is replaced
+    # by one block per metric, so no number or verdict is ever cut off.
+    natural = Measurement.get(console, console.options.update_width(10_000), table).maximum
+    if natural <= console.width:
+        console.print(table)
         console.print(
             Text(
                 "degradation > 0 means worse; interval = confidence interval of the degradation; "
