@@ -17,3 +17,7 @@ This file is generated from the commit history by git-cliff.
 
 - README, architecture, semantics, schema, adapters and roadmap
 
+### Build and CI
+
+- Move workflow actions to Node 24 releases
+
