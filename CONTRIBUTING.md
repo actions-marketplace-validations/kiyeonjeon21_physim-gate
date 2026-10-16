@@ -51,6 +51,7 @@ git cliff --tag v0.2.0 -o CHANGELOG.md
 ## Releasing
 
 1. Bump the version in `pyproject.toml` and `src/physim_gate/__init__.py`, and the action tag in the README and `examples/github-actions/physim-gate.yml`.
+   If the adapter contract still holds, widen the `physim-gate` upper bound in `examples/csv-adapter/pyproject.toml`; the `extras` CI job fails otherwise.
 2. Generate the changelog with git-cliff (above) and commit it.
 3. Tag the commit `vX.Y.Z`, push the tag, and publish a GitHub release for it.
 4. Publishing the release runs `.github/workflows/release.yml`, which builds, checks and tests the distributions and uploads them to PyPI with [trusted publishing](https://docs.pypi.org/trusted-publishers/). No API token is involved.
