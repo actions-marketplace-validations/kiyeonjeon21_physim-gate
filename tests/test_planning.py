@@ -329,3 +329,47 @@ def test_plan_cli_with_pilot_and_pairing(tmp_path: Path) -> None:
         result = runner.invoke(app, args)
         assert result.exit_code == 2, (args, result.output)
         assert message in result.output, (args, result.output)
+
+
+@pytest.mark.parametrize("pairing", ["paired", "unpaired"])
+def test_plan_from_an_underpowered_pilot_keeps_method_and_confidence(pairing: str) -> None:
+    """A pilot too small to decide is when planning is needed most.
+
+    Its plan must use the 0/1 method and the gate's confidence (after correction), exactly like
+    a pilot with the same proportions and enough trials.
+    """
+    base = [1.0] * 6 + [0.0, 1.0]
+    cand = [1.0] * 6 + [1.0, 0.0]
+    config = GateConfig.model_validate(
+        {
+            "version": 1,
+            "defaults": {"confidence": 0.99, "pairing": pairing},
+            "policy": {"correction": "bonferroni"},
+            "metrics": {
+                "success": {"max_absolute_degradation": 0.2},
+                "other": {"max_absolute_degradation": 1.0},
+            },
+        }
+    )
+
+    def plan(repeat: int) -> object:
+        pilot = compare_runs(
+            make_run({"success": base * repeat, "other": base * repeat}, run_id="b",
+                     directions={"success": "higher_is_better"}),
+            make_run({"success": cand * repeat, "other": cand * repeat}, run_id="c",
+                     directions={"success": "higher_is_better"}),
+            config,
+        )  # fmt: skip
+        verdict = pilot.metrics[0].evidence.outcome.value
+        [item] = plan_from_comparison(pilot, metrics=["success"])
+        assert item.plan is not None, item.reason
+        return verdict, item.plan
+
+    small_verdict, small = plan(1)
+    large_verdict, large = plan(4)
+    assert small_verdict == "insufficient_samples"
+    assert large_verdict != "insufficient_samples"
+    assert small.confidence == large.confidence == pytest.approx(1 - 0.01 / 2)  # type: ignore[attr-defined]
+    assert small.method == large.method  # type: ignore[attr-defined]
+    assert "normal approximation" not in small.method  # type: ignore[attr-defined]
+    assert small.trials == large.trials  # type: ignore[attr-defined]

@@ -28,8 +28,9 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 
 from physim_gate.comparison import ComparisonResult, MetricComparison
+from physim_gate.config import Statistic
 from physim_gate.schema import Direction
-from physim_gate.stats import newcombe_counts, newcombe_paired_counts
+from physim_gate.stats import is_binary, newcombe_counts, newcombe_paired_counts
 
 #: Simulated comparisons per candidate size for paired 0/1 metrics.
 PAIRED_SIMULATIONS = 4000
@@ -493,27 +494,38 @@ def plan_from_comparison(
         if metrics and metric.name not in metrics:
             continue
         try:
-            plans.append(
-                MetricPlan(metric.name, _plan_metric(metric, true_degradation, power, max_trials))
-            )
+            plan = _plan_metric(result, metric, true_degradation, power, max_trials)
+            plans.append(MetricPlan(metric.name, plan))
         except PlanningError as exc:
             plans.append(MetricPlan(metric.name, None, str(exc)))
     return plans
 
 
 def _plan_metric(
-    metric: MetricComparison, true_degradation: float | None, power: float, max_trials: int
+    result: ComparisonResult,
+    metric: MetricComparison,
+    true_degradation: float | None,
+    power: float,
+    max_trials: int,
 ) -> Plan:
     n, base, cand = metric.numerical, metric.baseline, metric.candidate
     if n is None or base is None or cand is None or metric.direction is None:
         raise PlanningError(f"{metric.verdict.value}: the pilot has no usable values")
     degradation = n.degradation if true_degradation is None else true_degradation
-    confidence = metric.evidence.adjusted_confidence or 0.95
+    # A pilot with fewer than min_samples observations has no interval, so its evidence records
+    # neither the method nor the confidence. Derive both the way the engine would have.
+    confidence = metric.evidence.adjusted_confidence or result.config.adjusted_confidence(
+        metric.name
+    )
     paired = metric.pairing is not None and metric.pairing.mode == "paired"
-    method = metric.evidence.method or ""
+    method = metric.evidence.method
+    if method is None:
+        binary = metric.statistic is Statistic.MEAN and is_binary(base.values + cand.values)
+    else:
+        binary = method.endswith("newcombe")
     lower = metric.direction is Direction.LOWER_IS_BETTER
 
-    if method.endswith("newcombe"):
+    if binary:
         if not paired:
             return plan_binary(
                 base.mean or 0.0,
@@ -577,6 +589,6 @@ def _plan_metric(
         min_samples=metric.min_samples,
         max_trials=max_trials,
     )
-    if metric.statistic.value == "median":
+    if metric.statistic is Statistic.MEDIAN:
         plan.notes.append("the plan assumes the mean; medians usually need more trials")
     return plan

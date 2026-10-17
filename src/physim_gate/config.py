@@ -125,6 +125,13 @@ class GateConfig(_Model):
     policy: Policy = Field(default_factory=Policy)
     metrics: Annotated[dict[str, MetricGate], Field(min_length=1)]
 
+    def adjusted_confidence(self, name: str) -> float:
+        """The confidence of one metric's interval after any multiple-testing correction."""
+        confidence = self.resolve(name).confidence
+        if self.policy.correction is Correction.BONFERRONI:
+            return 1.0 - (1.0 - confidence) / len(self.metrics)
+        return confidence
+
     def resolve(self, name: str) -> ResolvedMetricGate:
         gate = self.metrics[name]
         d = self.defaults
