@@ -35,7 +35,8 @@ inputs:
   comment:
     description: >-
       On pull requests, post the Markdown summary as a comment and update it on later runs.
-      Needs "pull-requests: write" permission.
+      Needs "pull-requests: write" permission. Pull requests from forks get no comment (their
+      token is read-only), and a failure to comment is a warning; neither changes the verdict.
     default: "false"
   setup-python:
     description: Install Python with actions/setup-python first. Set to false to use the runner's.
@@ -97,6 +98,10 @@ runs:
           if [ -n "$option" ]; then args+=(-O "$option"); fi
         done <<< "$ADAPTER_OPTIONS"
 
+        # Reports from an earlier run in the same directory must never be read as this run's.
+        rm -f "$OUTPUT_DIR/comparison.json" "$OUTPUT_DIR/junit.xml" \
+              "$OUTPUT_DIR/report.html" "$OUTPUT_DIR/summary.md"
+
         set +e
         physim-gate "${args[@]}"
         code=$?
@@ -104,7 +109,8 @@ runs:
 
         echo "exit-code=$code" >> "$GITHUB_OUTPUT"
         echo "report-dir=$OUTPUT_DIR" >> "$GITHUB_OUTPUT"
-        if [ -f "$OUTPUT_DIR/comparison.json" ]; then
+        # Exit codes 0, 1 and 3 mean a comparison was made; 2 and 4 mean it was not.
+        if [[ "$code" =~ ^[013]$ ]] && [ -f "$OUTPUT_DIR/comparison.json" ]; then
           verdict=$(python -c 'import json, sys; print(json.load(open(sys.argv[1]))["verdict"])' \
             "$OUTPUT_DIR/comparison.json")
           echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
@@ -117,16 +123,27 @@ runs:
       env:
         GH_TOKEN: ${{ inputs.github-token }}
         REPOSITORY: ${{ github.repository }}
+        HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
         SUMMARY: ${{ steps.gate.outputs.report-dir }}/summary.md
       run: |
+        # The comment is a convenience; the verdict is applied by the next step either way.
+        if [ "$HEAD_REPOSITORY" != "$REPOSITORY" ]; then
+          echo "::notice title=physim-gate::Not commenting: the pull request comes from the fork $HEAD_REPOSITORY, and its token cannot write comments. The summary is in the job summary."
+          exit 0
+        fi
         marker="<!-- physim-gate -->"
-        existing=$(gh api --paginate "repos/$REPOSITORY/issues/$PR_NUMBER/comments" \
-          --jq "map(select(.body | startswith(\"$marker\"))) | .[0].id // empty" | head -n 1)
-        if [ -n "$existing" ]; then
-          gh api --method PATCH "repos/$REPOSITORY/issues/comments/$existing" -F "body=@$SUMMARY" > /dev/null
-        else
-          gh api --method POST "repos/$REPOSITORY/issues/$PR_NUMBER/comments" -F "body=@$SUMMARY" > /dev/null
+        post() {
+          existing=$(gh api --paginate "repos/$REPOSITORY/issues/$PR_NUMBER/comments" \
+            --jq "map(select(.body | startswith(\"$marker\"))) | .[0].id // empty" | head -n 1)
+          if [ -n "$existing" ]; then
+            gh api --method PATCH "repos/$REPOSITORY/issues/comments/$existing" -F "body=@$SUMMARY" > /dev/null
+          else
+            gh api --method POST "repos/$REPOSITORY/issues/$PR_NUMBER/comments" -F "body=@$SUMMARY" > /dev/null
+          fi
+        }
+        if ! post; then
+          echo "::warning title=physim-gate::Could not comment on the pull request. Give the job \"pull-requests: write\" permission, or set comment to false. The summary is in the job summary."
         fi
 
     - name: Apply the verdict
