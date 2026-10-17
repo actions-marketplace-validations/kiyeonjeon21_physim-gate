@@ -3,6 +3,16 @@
 All notable changes to this project are documented here.
 This file is generated from the commit history by git-cliff.
 
+## [0.3.1] - 2026-10-17
+
+### Bug fixes
+
+- Close three ways to get a silently wrong verdict or exit code
+
+### Documentation
+
+- Add the v0.3.0 review with prioritized findings
+
 ## [0.3.0] - 2026-10-16
 
 ### Features
