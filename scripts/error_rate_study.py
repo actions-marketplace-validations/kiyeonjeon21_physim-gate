@@ -28,14 +28,16 @@ from physim_gate.schema import RunResult
 Generator = Callable[[random.Random, int], tuple[list[float], list[float]]]
 
 
-def _run(values: list[float], direction: str, run_id: str) -> RunResult:
+def _run(values: list[float], direction: str, run_id: str, prefix: str = "t") -> RunResult:
     return RunResult.model_validate(
         {
             "run_id": run_id,
             "simulator": {"name": "monte-carlo"},
             "scenario": {"id": "study"},
             "metrics": {"m": {"direction": direction}},
-            "trials": [{"trial_id": f"t{i}", "metrics": {"m": v}} for i, v in enumerate(values)],
+            "trials": [
+                {"trial_id": f"{prefix}{i}", "metrics": {"m": v}} for i, v in enumerate(values)
+            ],
         }
     )
 
@@ -48,6 +50,17 @@ def normal(shift: float, rho: float = 0.0) -> Generator:
         own = math.sqrt(1 - rho)
         base = [10 + math.sqrt(rho) * s + own * rng.gauss(0, 1) for s in shared]
         cand = [10 + shift + math.sqrt(rho) * s + own * rng.gauss(0, 1) for s in shared]
+        return base, cand
+
+    return generate
+
+
+def normal_large_baseline(shift: float, n_baseline: int = 1000) -> Generator:
+    """A large stored baseline against a small candidate: n is the candidate's size."""
+
+    def generate(rng: random.Random, n: int) -> tuple[list[float], list[float]]:
+        base = [10 + rng.gauss(0, 1) for _ in range(n_baseline)]
+        cand = [10 + shift + rng.gauss(0, 1) for _ in range(n)]
         return base, cand
 
     return generate
@@ -100,7 +113,12 @@ def rates(
     counts = dict.fromkeys(("PASS", "FAIL", "INCONCLUSIVE", "INVALID"), 0)
     for rep in range(reps):
         base, cand = generate(random.Random(f"rep-{rep}"), n)
-        result = compare_runs(_run(base, direction, "b"), _run(cand, direction, "c"), config)
+        # Samples of different sizes are independent; distinct ids keep them from counting as
+        # missing trials of each other.
+        prefixes = ("t", "t") if len(base) == len(cand) else ("b", "c")
+        result = compare_runs(
+            _run(base, direction, "b", prefixes[0]), _run(cand, direction, "c", prefixes[1]), config
+        )
         counts[result.metrics[0].verdict.value] += 1
     return {verdict: count / reps for verdict, count in counts.items()}
 
@@ -110,6 +128,8 @@ UNPAIRED = {"pairing": "unpaired"}
 
 SCENARIOS: list[tuple[str, Generator, str, dict[str, Any], tuple[int, ...]]] = [
     ("normal, unpaired, at margin", normal(0.5), LOWER,
+     {"max_absolute_degradation": 0.5, **UNPAIRED}, (10, 30, 100)),
+    ("normal, unpaired, 1000 baseline trials, at margin", normal_large_baseline(0.5), LOWER,
      {"max_absolute_degradation": 0.5, **UNPAIRED}, (10, 30, 100)),
     ("normal, paired rho=0.8, at margin", normal(0.5, 0.8), LOWER,
      {"max_absolute_degradation": 0.5}, (10, 30, 100)),

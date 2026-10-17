@@ -66,9 +66,11 @@ def test_percentile_bootstrap_matches_scipy(paired: bool) -> None:
 def test_expanded_percentile_levels_match_scipy_t_quantiles() -> None:
     for df in (1, 2, 5, 9, 29, 100, 1000):
         assert _t_quantile(0.975, df) == pytest.approx(scipy_stats.t.ppf(0.975, df), rel=1e-10)
+    for df in (2.5, 9.37, 117.2):
+        assert _t_quantile(0.975, df) == pytest.approx(scipy_stats.t.ppf(0.975, df), rel=1e-10)
     for n, df in ((10, 9), (10, 18), (30, 29), (200, 398)):
         expected = 2 * scipy_stats.norm.cdf(-np.sqrt(n / (n - 1)) * scipy_stats.t.ppf(0.975, df))
-        assert _expanded_alpha(0.05, n, df) == pytest.approx(expected, rel=1e-9)
+        assert _expanded_alpha(0.05, n / (n - 1), df) == pytest.approx(expected, rel=1e-9)
 
 
 def test_unpaired_newcombe_matches_statsmodels() -> None:

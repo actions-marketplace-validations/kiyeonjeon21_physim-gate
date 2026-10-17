@@ -114,3 +114,28 @@ def test_wilson_and_binary_helpers() -> None:
     assert not is_binary([0.0, 0.5])
     with pytest.raises(ValueError, match="n > 0"):
         wilson_interval(0, 0, 1.96)
+
+
+@pytest.mark.parametrize(("nb", "nc"), [(1000, 10), (10, 1000), (10, 10), (40, 60)])
+def test_expanded_bootstrap_matches_welch_width_for_unequal_samples(nb: int, nc: int) -> None:
+    """The expanded interval should be about as wide as Welch's t interval.
+
+    With a large baseline and a small candidate the uncertainty comes almost entirely from the
+    candidate, so the t quantile needs about n_candidate - 1 degrees of freedom, not
+    n_baseline + n_candidate - 2.
+    """
+    import random
+    import statistics
+
+    from physim_gate.stats import _t_quantile
+
+    rng = random.Random(f"welch-{nb}-{nc}")
+    baseline = [rng.gauss(0, 1) for _ in range(nb)]
+    candidate = [rng.gauss(0, 1) for _ in range(nc)]
+    vb = statistics.variance(baseline) / nb
+    vc = statistics.variance(candidate) / nc
+    df = (vb + vc) ** 2 / (vb**2 / (nb - 1) + vc**2 / (nc - 1))
+    welch = _t_quantile(0.975, df) * (vb + vc) ** 0.5
+    result = boot(baseline=baseline, candidate=candidate, resamples=40_000)
+    low, high = result.degradation  # type: ignore[attr-defined]
+    assert (high - low) / 2 == pytest.approx(welch, rel=0.04)

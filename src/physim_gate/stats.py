@@ -123,10 +123,11 @@ def bootstrap_degradation(
     levels = {"degradation": (alpha / 2, 1 - alpha / 2), "excess": (alpha / 2, 1 - alpha / 2)}
     if method is BootstrapMethod.EXPANDED:
         if paired:
-            n, df = len(baseline), len(baseline) - 1
+            n = len(baseline)
+            inflation, df = (n / (n - 1), n - 1) if n > 1 else (1.0, 0.0)
         else:
-            n, df = min(len(baseline), len(candidate)), len(baseline) + len(candidate) - 2
-        expanded = _expanded_alpha(alpha, n, df)
+            inflation, df = _welch_expansion(baseline, candidate)
+        expanded = _expanded_alpha(alpha, inflation, df)
         levels = dict.fromkeys(levels, (expanded / 2, 1 - expanded / 2))
     return BootstrapResult(
         degradation=(
@@ -137,23 +138,46 @@ def bootstrap_degradation(
     )
 
 
-def _expanded_alpha(alpha: float, n: int, df: int) -> float:
+def _expanded_alpha(alpha: float, inflation: float, df: float) -> float:
     """Hesterberg's expanded percentile interval (2015, The American Statistician 69:371).
 
     The percentile interval is too narrow for small samples, partly because the bootstrap uses
     the plug-in variance (divisor n) and partly because it ignores the extra tail weight that a
     t distribution would add. Both are undone by using the percentiles
-    ``Phi(+-sqrt(n / (n - 1)) * t[alpha/2, df])`` instead of ``alpha / 2``. For one sample (or
-    pairs) ``df = n - 1``; for two independent samples ``n`` is the smaller sample and
-    ``df = n_baseline + n_candidate - 2``.
+    ``Phi(+-sqrt(inflation) * t[alpha/2, df])`` instead of ``alpha / 2``, where ``inflation`` is
+    the ratio of the unbiased to the plug-in variance of the statistic. For one sample (or
+    pairs) that is ``n / (n - 1)`` with ``df = n - 1``; for two independent samples see
+    :func:`_welch_expansion`.
     """
-    if n < 2 or df < 1:
+    if inflation <= 0 or not df >= 1:
         return alpha
     t = _t_quantile(1 - alpha / 2, df)
-    return 2 * statistics.NormalDist().cdf(-math.sqrt(n / (n - 1)) * t)
+    return 2 * statistics.NormalDist().cdf(-math.sqrt(inflation) * t)
 
 
-def _t_quantile(probability: float, df: int) -> float:
+def _welch_expansion(baseline: Sequence[float], candidate: Sequence[float]) -> tuple[float, float]:
+    """Variance inflation and Welch-Satterthwaite degrees of freedom for two samples.
+
+    The variance of the difference is ``s_b^2 / n_b + s_c^2 / n_c``, while the bootstrap sees
+    the plug-in version ``s_b^2 (n_b - 1) / n_b^2 + s_c^2 (n_c - 1) / n_c^2``. Their ratio is the
+    inflation. The degrees of freedom follow the larger variance term, so a small candidate
+    against a large baseline gets about ``n_c - 1`` instead of ``n_b + n_c - 2``. For two
+    samples of equal size and variance this is exactly ``n / (n - 1)`` and ``2n - 2``.
+    """
+    nb, nc = len(baseline), len(candidate)
+    if nb < 2 or nc < 2:
+        return 1.0, 0.0
+    vb = statistics.variance(baseline) / nb
+    vc = statistics.variance(candidate) / nc
+    plug_in = vb * (nb - 1) / nb + vc * (nc - 1) / nc
+    if plug_in <= 0:
+        # Both samples are constant: the interval has zero width whatever the expansion.
+        return 1.0, 0.0
+    df = (vb + vc) ** 2 / (vb**2 / (nb - 1) + vc**2 / (nc - 1))
+    return (vb + vc) / plug_in, df
+
+
+def _t_quantile(probability: float, df: float) -> float:
     """Student t quantile by bisection on the CDF (regularized incomplete beta)."""
 
     def cdf(x: float) -> float:
