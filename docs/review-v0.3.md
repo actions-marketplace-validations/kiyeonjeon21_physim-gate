@@ -58,7 +58,7 @@ Everything else is listed for later.
 ## P1
 
 All thirteen P1 findings were addressed after v0.3.1, each with a test that fails without the change.
-P1-13 is addressed in the workflows only; branch protection and a required reviewer for the `pypi` environment are repository settings.
+For P1-13 the repository settings were changed too: `main` requires the CI checks and linear history and forbids force pushes and deletion, and the `pypi` environment requires a maintainer's approval.
 
 | # | Resolution | Tests |
 |---|---|---|
@@ -74,7 +74,7 @@ P1-13 is addressed in the workflows only; branch protection and a required revie
 | P1-10 | Run-level blocking no longer depends on `on_invalid`. A gate where no metric could be compared is `INVALID`; a gate with no required metric says so in its summary | `tests/test_integrity.py` |
 | P1-11 | A relative margin is undefined, like for a zero baseline, when the baseline values have both signs | `tests/test_integrity.py::test_relative_margin_is_invalid_for_values_of_both_signs` |
 | P1-12 | `docs/comparison-semantics.md` explains that constant 0/1 data keeps a wide score interval | Documentation |
-| P1-13 | `release.yml` runs the whole CI workflow on the released commit before building and publishing | Workflow |
+| P1-13 | `release.yml` runs the whole CI workflow on the released commit before building and publishing; branch protection on `main` and a required reviewer for the `pypi` environment | Workflow, verified by the v0.4.0 release |
 
 ### Confirmed defects
 
