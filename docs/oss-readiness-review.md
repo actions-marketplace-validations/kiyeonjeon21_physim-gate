@@ -83,7 +83,7 @@ Exit codes are the interface CI depends on, so these matter more than their size
 | 18 | The statistics are reimplemented rather than calling scipy or statsmodels. | It keeps the install small (3 runtime dependencies) but adds maintenance and risk. | Add an optional test that cross-checks against scipy and statsmodels when installed. |
 | 19 | `physim-gate init` writes `max_absolute_degradation: 0.0` for continuous metrics with a zero mean. | With any noise, such a metric can almost never PASS. | Emit a commented placeholder that forces the user to choose. |
 | 20 | Exit code 1 means "regression" for `compare` but "invalid file" for `validate`. | Easy to misread in scripts. | Keep for 0.x but consider distinct codes before 1.0. |
-| 21 | `policy.require_same_scenario` only blocks when `on_invalid` is `fail`. | Two settings interact in a non-obvious way. | Document more prominently or decouple. Decoupled after v0.3.1 (review v0.3, P1-10). |
+| 21 | `policy.require_same_scenario` only blocks when `on_invalid` is `fail`. | Two settings interact in a non-obvious way. | Document more prominently or decouple. Decoupled in v0.4.0 (review v0.3, P1-10). |
 | 22 | Only per-trial scalar metrics. | Trajectory-level regressions must be reduced to scalars by the user. | As in the roadmap; do not add before there is demand. |
 
 ### P3: project hygiene

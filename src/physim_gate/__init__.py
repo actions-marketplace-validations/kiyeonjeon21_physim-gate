@@ -10,7 +10,7 @@ Typical library use::
 
 from __future__ import annotations
 
-__version__ = "0.3.1"
+__version__ = "0.4.0"
 
 from physim_gate.comparison import (
     ComparisonResult,

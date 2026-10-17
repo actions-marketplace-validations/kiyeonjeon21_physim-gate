@@ -355,7 +355,7 @@ PhySim Gate makes a narrow, explicit claim, and it is worth knowing where that c
 On GitHub Actions, use the action in this repository:
 
 ```yaml
-- uses: kiyeonjeon21/physim-gate@v0.3.1
+- uses: kiyeonjeon21/physim-gate@v0.4.0
   with:
     baseline: results/baseline.json
     candidate: results/candidate.json
@@ -449,7 +449,7 @@ With the `gymnasium` extra, `physim_gate.adapters.gymnasium.run_gymnasium(env_id
 
 ## Supported and not supported
 
-| Capability | Status in v0.3.1 |
+| Capability | Status in v0.4.0 |
 |---|---|
 | Run-result schema 1.0 (JSON), JSON Schema export | Supported |
 | Baseline vs candidate comparison, paired and unpaired (expanded percentile bootstrap, Newcombe score intervals) | Supported |
