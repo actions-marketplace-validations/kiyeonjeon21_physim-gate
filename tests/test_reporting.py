@@ -147,6 +147,26 @@ def test_terminal_table_and_narrow_layout() -> None:
     assert "degradation +2 m/s" in text
 
 
+def test_long_summaries_and_notes_wrap_with_a_hanging_indent() -> None:
+    values = [float(i % 5) for i in range(N)]
+    base = make_run({"m": values}, run_id="b", scenario="a-long-scenario-name-for-wrapping")
+    cand = make_run({"m": values}, run_id="c", scenario="another-long-scenario-name-to-wrap")
+    comparison = compare_runs(base, cand, make_config({"m": {"max_absolute_degradation": 1}}))
+    for width, indent in ((80, 24), (50, 0)):
+        console = Console(width=width, record=True, color_system=None)
+        print_comparison(comparison, console)
+        lines = console.export_text().splitlines()
+        assert all(len(line) <= width for line in lines), width
+        assert all(line == line.rstrip() for line in lines if not line.startswith("m ")), width
+        header = lines[: next(i for i, line in enumerate(lines) if line.startswith("scenario"))]
+        assert len(header) > 1
+        assert all(line.startswith(" " * indent) and line[indent] != " " for line in header[1:])
+        note = lines.index(next(line for line in lines if "[blocking]" in line))
+        assert lines[note].startswith("  - [blocking] scenario differs")
+        assert lines[note + 1].startswith("    ")
+        assert lines[note + 1][4] != " "
+
+
 def test_comparison_round_trip_and_rejections() -> None:
     original = result()
     data = original.model_dump(mode="json")

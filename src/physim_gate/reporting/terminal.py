@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
+import textwrap
 
 from rich.console import Console
 from rich.measure import Measurement
@@ -154,19 +155,30 @@ def print_comparison(
     result: ComparisonResult, console: Console | None = None, *, verbose: bool = False
 ) -> None:
     console = console or make_console()
-    header = Text("PhySim Gate  ")
-    header.append(f" {result.verdict.value} ", style="reverse " + VERDICT_STYLE[result.verdict])
-    header.append(f"  {result.summary}")
-    console.print(header)
+    prefix = Text("PhySim Gate  ")
+    prefix.append(f" {result.verdict.value} ", style="reverse " + VERDICT_STYLE[result.verdict])
+    prefix.append("  ")
+    if console.width - len(prefix) >= 40:
+        # Wrapped summary lines hang under the summary's first word.
+        lines = _wrap(result.summary, console.width - len(prefix)) or [""]
+        console.print(prefix + Text(lines[0]), soft_wrap=True)
+        indent = " " * len(prefix)
+    else:
+        # Too narrow for a hanging indent: the summary starts on its own line.
+        lines = ["", *_wrap(result.summary, console.width)]
+        prefix.rstrip()
+        console.print(prefix, soft_wrap=True)
+        indent = ""
+    for line in lines[1:]:
+        console.print(Text(indent + line), soft_wrap=True)
     scenario = result.candidate.scenario
     sims = {_simulator(result.baseline), _simulator(result.candidate)}
-    console.print(
-        Text(
-            f"scenario  {scenario.id} ({result.candidate.domain.value}) | "
-            f"simulator {' vs '.join(sorted(sims))}",
-            style="dim",
-        )
+    context = (
+        f"scenario  {scenario.id} ({result.candidate.domain.value}) | "
+        f"simulator {' vs '.join(sorted(sims))}"
     )
+    for line in _wrap(context, console.width):
+        console.print(Text(line, style="dim"), soft_wrap=True)
     console.print(_run_line("baseline", result.baseline))
     console.print(_run_line("candidate", result.candidate))
     console.print()
@@ -177,13 +189,12 @@ def print_comparison(
     natural = Measurement.get(console, console.options.update_width(10_000), table).maximum
     if natural <= console.width:
         console.print(table)
-        console.print(
-            Text(
-                "degradation > 0 means worse; interval = confidence interval of the degradation; "
-                "n = matched pairs or baseline/candidate observations",
-                style="dim",
-            )
+        legend = (
+            "degradation > 0 means worse; interval = confidence interval of the degradation; "
+            "n = matched pairs or baseline/candidate observations"
         )
+        for line in _wrap(legend, console.width):
+            console.print(Text(line, style="dim"), soft_wrap=True)
     else:
         _blocks(console, result)
 
@@ -193,15 +204,24 @@ def print_comparison(
         for m in shown:
             console.print(Text(f"{m.name}: ", style="bold").append_text(_verdict(m)))
             for reason in m.reasons:
-                console.print(Padding(Text(f"- {reason}"), (0, 0, 0, 2), expand=False))
+                _bullet(console, reason)
     if result.run_blocking_issues or result.run_issues:
         console.print()
         console.print(Text("run notes", style="bold"))
         for issue in result.run_blocking_issues:
-            console.print(
-                Padding(Text(f"- [blocking] {issue}", style="magenta"), (0, 0, 0, 2), expand=False)
-            )
+            _bullet(console, f"[blocking] {issue}", style="magenta")
         for issue in result.run_issues:
-            console.print(Padding(Text(f"- {issue}"), (0, 0, 0, 2), expand=False))
+            _bullet(console, issue)
     if result.untracked_metrics:
         console.print(Text(f"not gated: {', '.join(result.untracked_metrics)}", style="dim"))
+
+
+def _wrap(text: str, width: int) -> list[str]:
+    """Wrap at spaces only, so paths and identifiers stay whole even if a line overflows."""
+    return textwrap.wrap(text, width=max(width, 20), break_long_words=False, break_on_hyphens=False)
+
+
+def _bullet(console: Console, text: str, style: str = "") -> None:
+    """``  - text`` with wrapped lines indented under the text, without trailing padding."""
+    for i, line in enumerate(_wrap(text, console.width - 4)):
+        console.print(Text(("  - " if i == 0 else "    ") + line, style=style), soft_wrap=True)
