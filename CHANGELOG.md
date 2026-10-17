@@ -3,6 +3,25 @@
 All notable changes to this project are documented here.
 This file is generated from the commit history by git-cliff.
 
+## [0.4.0] - 2026-10-17
+
+### Bug fixes
+
+- **stats:** Use Welch degrees of freedom in the expanded two-sample bootstrap
+- **plan:** Plan underpowered pilots with the gate's method and confidence
+- **action:** Never report a stale verdict, and do not fail on fork pull requests
+- **lerobot:** Require a scenario name for the single-task layout
+- **engine:** Block comparisons of runs that are not comparable
+- **terminal:** Wrap long summaries and notes with a hanging indent
+
+### Documentation
+
+- Document the P1 fixes of the v0.3.0 review
+
+### Build and CI
+
+- Run the whole CI workflow before publishing a release
+
 ## [0.3.1] - 2026-10-17
 
 ### Bug fixes
