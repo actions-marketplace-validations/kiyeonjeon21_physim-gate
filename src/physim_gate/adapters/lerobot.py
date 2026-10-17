@@ -94,13 +94,13 @@ class LeRobotAdapter:
         if not trials:
             raise SchemaError(f"{path}: contains no episodes")
 
-        default_scenario = "+".join(groups) if groups else "lerobot-eval"
+        scenario = options.get("scenario") or "+".join(groups)
         try:
-            return RunResult(
+            run = RunResult(
                 run_id=options.get("run_id") or _default_run_id(source, path),
                 domain=Domain.ROBOTICS,
                 simulator=Simulator(name="lerobot"),
-                scenario=Identifier(id=options.get("scenario") or default_scenario),
+                scenario=Identifier(id=scenario or "unnamed"),
                 policy=Identifier(id=options["policy"]) if options.get("policy") else None,
                 seeds=sorted({t.seed for t in trials if t.seed is not None}),
                 metrics=dict(METRICS),
@@ -111,6 +111,16 @@ class LeRobotAdapter:
             raise SchemaError(
                 f"{path}: cannot convert to a run result", format_validation_error(exc)
             ) from exc
+        if not scenario:
+            # The single-task layout does not name its environment. A shared placeholder would
+            # let runs of different environments pass the same-scenario check and share one
+            # stored baseline.
+            raise AdapterError(
+                f"{path}: the single-task layout ('per_episode') does not record which "
+                "environment was evaluated; name it with -O scenario=<name>, for example "
+                "-O scenario=pusht"
+            )
+        return run
 
 
 def _read(path: Path) -> dict[str, Any]:

@@ -134,13 +134,15 @@ def test_legacy_single_task_layout(tmp_path: Path) -> None:
             "aggregated": {"pc_success": 50.0},
         },
     )
-    run = load(path)
+    run = load(path, scenario="pusht")
     assert [t.trial_id for t in run.trials] == ["episode-0", "episode-1"]
     assert [t.seed for t in run.trials] == [7, 8]
-    assert run.scenario.id == "lerobot-eval"
+    assert run.scenario.id == "pusht"
     assert run.labels == {"lerobot.layout": "per_episode"}
     with pytest.raises(AdapterError, match="task_group needs the multi-task layout"):
         load(path, task_group="x")
+    with pytest.raises(AdapterError, match="-O scenario=<name>"):
+        load(path)
 
 
 @pytest.mark.parametrize(
@@ -179,8 +181,8 @@ def test_infinite_values_and_seed_numbering_for_the_single_task_layout(tmp_path:
     with pytest.raises(SchemaError, match="infinite value"):
         load(path)
     path = write(tmp_path, {"per_episode": [{"success": 1}, {"success": 0}]})
-    assert [t.seed for t in load(path, start_seed="5").trials] == [5, 6]
-    assert [t.seed for t in load(path).trials] == [None, None]
+    assert [t.seed for t in load(path, start_seed="5", scenario="s").trials] == [5, 6]
+    assert [t.seed for t in load(path, scenario="s").trials] == [None, None]
 
 
 def test_rejects_unreadable_input_and_bad_options(tmp_path: Path) -> None:
@@ -192,3 +194,29 @@ def test_rejects_unreadable_input_and_bad_options(tmp_path: Path) -> None:
         load(REAL, start_seed="x")
     with pytest.raises(AdapterError, match="does not accept option"):
         load(REAL, seed="1")
+
+
+def test_single_task_layout_needs_a_scenario_name(tmp_path: Path) -> None:
+    """The 0.3.x layout does not say which environment it evaluated.
+
+    Without a name, a PushT baseline and an ALOHA candidate would both be scenario
+    'lerobot-eval' and pass the same-scenario check, and would share one stored baseline.
+    """
+    from typer.testing import CliRunner
+
+    from physim_gate.cli import app
+
+    episodes = [{"episode_ix": i, "success": i % 3 != 0, "sum_reward": 1.0, "max_reward": 1.0}
+                for i in range(40)]  # fmt: skip
+    pusht, aloha = tmp_path / "pusht", tmp_path / "aloha"
+    for directory in (pusht, aloha):
+        directory.mkdir()
+        write(directory, {"per_episode": episodes})
+    gate = tmp_path / "gate.yaml"
+    gate.write_text("version: 1\nmetrics:\n  success:\n    max_absolute_degradation: 0.5\n")
+    args = ["compare", "-a", "lerobot", "-b", str(pusht), "-c", str(aloha), "-g", str(gate)]
+
+    result = CliRunner().invoke(app, args)
+    assert result.exit_code == 2, result.output
+    assert "-O scenario=<name>" in result.output
+    assert CliRunner().invoke(app, [*args, "-O", "scenario=pusht"]).exit_code == 0
