@@ -322,6 +322,7 @@ The default is conservative.
 A metric passes only when the evidence shows it did not degrade beyond the margin.
 Inconclusive and invalid metrics block the gate unless `policy.on_inconclusive` or `policy.on_invalid` says otherwise.
 Missing values make a metric `INVALID` unless `max_missing_fraction` allows them, so crashed trials cannot silently drop out.
+Runs that are not comparable make the whole comparison `INVALID` whatever the policy says: a different scenario or scenario version, a failed run, a run in which every trial failed, or shared trial ids with different seeds.
 The built-in metric `physim.failure_rate`, derived from each trial's status, lets you gate crashes and timeouts directly.
 
 [docs/comparison-semantics.md](docs/comparison-semantics.md) specifies every rule, including thresholds, baselines of zero, pairing and missing data.
@@ -330,7 +331,7 @@ The built-in metric `physim.failure_rate`, derived from each trial's status, let
 
 PhySim Gate makes a narrow, explicit claim, and it is worth knowing where that claim is weak:
 
-- **The intervals are approximate.** In a [Monte Carlo study](docs/comparison-semantics.md#measured-error-rates) of the real engine, a metric whose true degradation equals the margin was wrongly called PASS or FAIL in at most 3.5% of runs on each side, including with only 10 trials; the nominal rate is 2.5%. `min_samples` (default 10) is a floor, not a guarantee.
+- **The intervals are approximate.** In a [Monte Carlo study](docs/comparison-semantics.md#measured-error-rates) of the real engine, a metric whose true degradation equals the margin was wrongly called PASS or FAIL in at most 3.4% of runs on each side, including with only 10 trials and against a much larger baseline; the nominal rate is 2.5%. `min_samples` (default 10) is a floor, not a guarantee.
 - **Rare events need many trials.** With a 1% baseline collision rate and a 2-point margin, 80 trials per run give `INCONCLUSIVE` about 89% of the time, even when the candidate's true rate is 6%. That is the honest answer for so little data. `physim-gate plan` tells you how many trials a decision needs.
 - **Each metric is tested separately.** With many gated metrics, the chance that at least one shows a spurious regression grows. `policy.correction: bonferroni` is available but off by default.
 - **Seeds do not make physics deterministic.** Matching `trial_id`s are treated as matched *conditions*. Pairing reduces noise from shared conditions; it does not assume bitwise-identical rollouts.
@@ -364,6 +365,7 @@ On GitHub Actions, use the action in this repository:
 
 It installs PhySim Gate from the same tag, writes `comparison.json`, `junit.xml`, `report.html` and `summary.md`, adds the Markdown summary to the job summary, and fails the step unless the gate passes.
 Its outputs are `verdict`, `exit-code` and `report-dir`; `fail: "false"` leaves the decision to later steps.
+Pull requests from forks get no comment, because their token is read-only, and a failure to comment is a warning; neither changes the verdict.
 [`examples/github-actions/physim-gate.yml`](examples/github-actions/physim-gate.yml) is a complete workflow that also uploads the report and publishes the JUnit results.
 
 Anywhere else, call the CLI:

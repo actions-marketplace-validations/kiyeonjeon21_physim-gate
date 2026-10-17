@@ -39,7 +39,8 @@ jobs:
           candidate: results/candidate.json
           config: gate.yaml
           output-dir: results/gate
-          comment: "true"   # post the summary on the pull request and update it on each push
+          comment: "true"   # post the summary on the pull request and update it on each push;
+                            # skipped for pull requests from forks (read-only token)
 
       - name: Upload the report
         if: always()

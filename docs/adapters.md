@@ -51,7 +51,7 @@ Discovery rules:
 
 ## Guidelines
 
-- **Map trial identity carefully.** `trial_id` should name the *condition* (scenario variant, seed, initial state), so that the same condition gets the same id in baseline and candidate runs. That enables paired comparison.
+- **Map trial identity carefully.** `trial_id` should name the *condition* (scenario variant, seed, initial state), so that the same condition gets the same id in baseline and candidate runs. That enables paired comparison. When both runs record a trial's `seed`, a shared id with different seeds blocks the comparison.
 - **Keep failed trials.** Emit them with `status` and `failure`, and report metric values where they are meaningful (for example `success: 0`). Do not drop them.
 - **Use `null` for unavailable values**, never `0` or a sentinel such as `-1`.
 - **Declare direction and unit** for every metric.
@@ -84,7 +84,8 @@ That also skips the `NaN` values `json.dump` writes there for empty groups; a `N
 
 Trial ids are `<task_group>/<task_id>/<episode index>` (multi-task) or `episode-<episode_ix>` (single-task).
 `lerobot-eval` seeds episode `i` of every task with `--seed + i`, so two evaluations with the same `--seed` and episode count share trial ids and are compared as matched pairs.
-The multi-task layout does not record seeds, so the adapter cannot check that both evaluations used the same one; that is up to you.
+The single-task layout records each episode's seed, and the comparison blocks when a shared trial id has different seeds in the two runs.
+The multi-task layout does not record seeds, so nothing can check that both evaluations used the same one; that is up to you.
 
 | Option | Meaning |
 |---|---|
@@ -92,7 +93,7 @@ The multi-task layout does not record seeds, so the adapter cannot check that bo
 | `task_group` | Read only this task group, for example `libero_spatial` |
 | `run_id` | Run id; defaults to the name of the output directory |
 | `policy` | Policy id to record, for example the Hugging Face repository of the checkpoint |
-| `scenario` | Scenario id; defaults to the task groups joined with `+` |
+| `scenario` | Scenario id; defaults to the task groups joined with `+`. **Required for the single-task layout**, which does not record its environment: a shared placeholder would let a PushT and an ALOHA evaluation pass the same-scenario check and share one stored baseline |
 
 Tested with real output of LeRobot 0.6.2 on PushT ([`examples/lerobot-pusht/`](../examples/lerobot-pusht)) and on four MetaWorld tasks ([`examples/lerobot-metaworld/`](../examples/lerobot-metaworld)), both in the multi-task layout.
 The single-task layout of LeRobot 0.3.x is tested with files constructed from LeRobot's source.

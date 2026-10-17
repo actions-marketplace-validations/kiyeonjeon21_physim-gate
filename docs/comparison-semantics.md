@@ -16,15 +16,27 @@ It is the contract: if the code disagrees with this document, that is a bug.
 ## Step 1: run-level checks
 
 Before looking at metrics, the two runs are checked for comparability.
+A blocking issue makes the overall verdict `INVALID` (exit code 3) whatever `policy.on_invalid` says.
+That setting tolerates metrics that cannot be compared, not runs that cannot be compared.
 
 | Check | Effect |
 |---|---|
-| `scenario.id` differs | Blocking (overall `INVALID`) when `policy.require_same_scenario` is true (default) and `policy.on_invalid` is `fail`. Otherwise a note |
-| `scenario.version`, `domain`, simulator name or version differ | Note only |
-| Same `run_id` in both runs | Note only (often a copy-paste mistake) |
-| Run `status` is not `completed` | Note only |
+| `scenario.id` differs | Blocking when `policy.require_same_scenario` is true (default). Otherwise a note |
+| `scenario.version` differs, and both runs set it | Blocking when `policy.require_same_scenario` is true. Otherwise, or when only one run sets it, a note |
+| A run's `status` is `failed` | Blocking |
+| Every trial of a run has a status other than `ok` | Blocking |
+| Some trials have a status other than `ok`, and `physim.failure_rate` is not gated | Note, suggesting to gate it |
+| A `trial_id` present in both runs has a different recorded `seed` in each | Blocking, because shared ids claim shared conditions. A note when every metric uses `pairing: unpaired` |
+| A run's `status` is `partial` | Note |
+| `domain`, simulator name or simulator version differ | Note. Comparing across simulator versions is often the point |
+| Same `run_id` in both runs | Note (often a copy-paste mistake) |
+| Both inputs have identical content | Note. A deterministic simulator can reproduce a run byte for byte |
+
+Giving the same file as baseline and candidate is an input error (exit code 2): such a comparison always passes.
+A stored baseline (`-b @main`) is checked like any other, so a baseline saved for an older scenario version is not used silently.
 
 Notes appear in every report under "run notes".
+In v0.3.1 and earlier only a differing `scenario.id` could block, and only with `policy.on_invalid: fail`.
 
 ## Step 2: metric identity
 
@@ -84,8 +96,10 @@ Each gated metric needs at least one of:
 
 If both are set, the **stricter** (smaller) margin applies.
 
-**Baseline of zero.** A relative margin of a zero baseline is zero, which would turn any increase into a regression.
-So when the baseline statistic is exactly 0:
+**Baseline of zero, or of both signs.** A relative margin needs a ratio scale.
+A relative margin of a zero baseline is zero, which would turn any increase into a regression.
+The same happens, less visibly, when the baseline values have both signs, as for a signed tracking error: their mean can be arbitrarily close to 0, and so can the margin.
+So when the baseline statistic is exactly 0, or the baseline sample contains both negative and positive values:
 
 - if an absolute margin is also set, it is used alone, and the report says so,
 - otherwise the metric is `INVALID`, with a message asking for an absolute margin.
@@ -112,12 +126,15 @@ Unless every value in both samples is exactly 0 or 1, a bootstrap estimates the 
 - The two-sided interval at `confidence` (default 0.95) is taken from the replicate quantiles (linear interpolation).
 - By default the quantiles are *expanded* for small samples (Hesterberg 2015, *The American Statistician* 69:371).
   Instead of the `alpha/2` and `1 - alpha/2` quantiles, the interval uses `Phi(-+sqrt(n/(n-1)) * t)`, where `t` is the Student t quantile for `alpha/2`.
-  For pairs, `n` is the number of pairs and the t distribution has `n - 1` degrees of freedom; for two independent samples, `n` is the smaller sample and the degrees of freedom are `n_baseline + n_candidate - 2`.
+  For pairs, `n` is the number of pairs and the t distribution has `n - 1` degrees of freedom.
+  For two independent samples, `n / (n - 1)` becomes the ratio of the unbiased variance of the difference (`s_b^2 / n_b + s_c^2 / n_c`) to the plug-in variance the bootstrap sees, and the degrees of freedom are Welch-Satterthwaite's.
+  For two samples of equal size and spread this is the same as `n / (n - 1)` with `2n - 2` degrees of freedom.
+  For a small candidate against a large stored baseline, the degrees of freedom are close to `n_candidate - 1`, because almost all of the uncertainty comes from the candidate.
   At 10 trials this turns the 95% interval into roughly a 98% one; at 100 trials the change is negligible.
 
 The plain percentile interval is too narrow for small samples.
 In the study below it was wrong at the margin in up to 5.5% of runs per side with 10 trials, against a nominal 2.5%.
-The expanded interval brings that to at most 3.5%, and costs little power: with 100 trials, an unchanged metric still PASSed in 93.7% of runs, against 93.8% with plain percentiles.
+The expanded interval brings that to at most 3.4%, and costs little power: with 100 trials, an unchanged metric still PASSed in 93.7% of runs, against 93.8% with plain percentiles.
 BCa intervals (bias-corrected and accelerated) were also measured, with an implementation checked against `scipy.stats.bootstrap`, and did not help: up to 7.6% per side with 10 skewed trials.
 Set `defaults.bootstrap_method: percentile` to reproduce comparisons made before v0.3.0.
 
@@ -156,8 +173,11 @@ The measured rates below show how close the implementation gets.
 This widens every interval, which makes both `FAIL` and `PASS` harder to reach.
 The default is `none`.
 
-**Zero variance.** If both samples are constant (a fully deterministic simulator), every replicate is identical and the interval has zero width.
+**Zero variance.** If both samples of a continuous metric are constant (a fully deterministic simulator), every replicate is identical and the interval has zero width.
 The comparison then reduces to an exact check of the degradation against the margin, which is the correct behavior for deterministic results.
+This does not hold for 0/1 metrics: constant 0/1 values use the score interval, which stays wide.
+For example 0 events in 50 trials against 0 in 50 gives an interval of about plus or minus 0.07, so a margin of 0.01 is `INCONCLUSIVE`.
+0 of 50 is compatible with a true rate of several percent, so that is the honest answer.
 
 ## Step 6: policy
 
@@ -175,10 +195,13 @@ Non-required metrics are evaluated and reported, but never block.
 The overall verdict, in order of precedence:
 
 1. `INVALID` if there is a blocking run-level issue,
-2. `FAIL` if any blocking metric is `FAIL`,
-3. `INVALID` if any blocking metric is `INVALID`,
-4. `INCONCLUSIVE` if any blocking metric is `INCONCLUSIVE`,
-5. `PASS` otherwise.
+2. `INVALID` if no gated metric could be compared at all, whatever `policy.on_invalid` and `required` say: a gate that compared nothing has shown nothing,
+3. `FAIL` if any blocking metric is `FAIL`,
+4. `INVALID` if any blocking metric is `INVALID`,
+5. `INCONCLUSIVE` if any blocking metric is `INCONCLUSIVE`,
+6. `PASS` otherwise.
+
+When no metric is `required`, nothing can block, and the summary starts with "no metric is required" so a report-only gate is not mistaken for a passing one.
 
 Exit codes: `PASS` is 0, `FAIL` is 1, `INCONCLUSIVE` and `INVALID` are 3.
 Exit code 2 is reserved for errors that prevent a comparison (bad arguments, unreadable or invalid files), and 4 for internal errors.
@@ -197,11 +220,12 @@ Away from the margin, the wrong verdict should be near 0 and the correct one sho
 
 | Scenario | Trials per run | PASS | FAIL | INCONCLUSIVE |
 |---|---|---|---|---|
-| Normal, unpaired, at margin | 10 / 30 / 100 | 2.1% / 2.1% / 1.6% | 2.5% / 2.4% / 2.5% | rest |
+| Normal, unpaired, at margin | 10 / 30 / 100 | 2.0% / 2.1% / 1.6% | 2.4% / 2.4% / 2.5% | rest |
+| Normal, unpaired, 1,000 baseline trials, at margin | 10 / 30 / 100 candidate trials | 2.2% / 2.9% / 2.8% | 2.5% / 2.7% / 3.4% | rest |
 | Normal, paired (correlation 0.8), at margin | 10 / 30 / 100 | 2.5% / 2.3% / 1.7% | 3.1% / 2.6% / 2.6% | rest |
-| Lognormal, mean +10%, relative margin 10% | 10 / 30 / 100 | 3.5% / 2.4% / 3.1% | 3.5% / 3.2% / 2.4% | rest |
-| Normal, unpaired, no change (correct: PASS) | 10 / 30 / 100 | 18.0% / 47.4% / 93.7% | 0.3% / 0% / 0% | rest |
-| Normal, unpaired, degradation 2x margin (correct: FAIL) | 10 / 30 / 100 | 0% / 0% / 0% | 18.1% / 47.5% / 94.2% | rest |
+| Lognormal, mean +10%, relative margin 10% | 10 / 30 / 100 | 3.1% / 2.4% / 3.1% | 3.0% / 2.9% / 2.4% | rest |
+| Normal, unpaired, no change (correct: PASS) | 10 / 30 / 100 | 17.9% / 47.4% / 93.7% | 0.3% / 0% / 0% | rest |
+| Normal, unpaired, degradation 2x margin (correct: FAIL) | 10 / 30 / 100 | 0% / 0% / 0% | 17.8% / 47.5% / 94.2% | rest |
 | Success 0.90 to 0.85, margin 0.05, unpaired, at margin | 30 / 100 / 300 | 2.4% / 3.2% / 2.9% | 2.5% / 2.8% / 2.1% | rest |
 | Success 0.90 to 0.85, margin 0.05, paired, at margin | 30 / 100 / 300 | 0.1% / 3.0% / 2.6% | 0.7% / 0.8% / 2.0% | rest |
 | Collision 0.01 to 0.03, margin 0.02, unpaired, at margin | 30 / 80 / 300 | 0% / 0.5% / 1.8% | 0% / 0.5% / 1.6% | rest |
@@ -210,7 +234,8 @@ Away from the margin, the wrong verdict should be near 0 and the correct one sho
 
 What this shows:
 
-- The expanded bootstrap stays close to nominal from 10 trials on: at most 3.5% per side, for skewed data with 10 trials. With plain percentiles the same rows reached 5.5% (v0.2 and earlier; `--method percentile` reproduces them).
+- The expanded bootstrap stays close to nominal from 10 trials on: at most 3.4% per side. With plain percentiles the same rows reached 5.5% (v0.2 and earlier; `--method percentile` reproduces them).
+- Very unequal samples are covered too. Up to v0.3.1 the degrees of freedom were `n_baseline + n_candidate - 2`, and 10 candidate trials against 1,000 baseline trials were wrong at the margin in 4.3% and 4.7% of runs per side (4,000 repetitions).
 - The price is power at very small samples: with 10 trials an unchanged metric PASSes in 18% of runs instead of 25%. From about 30 trials the difference is a few points, and at 100 it is gone.
 - The score intervals for 0/1 metrics stay near or below nominal. For rare events they are conservative, which means many `INCONCLUSIVE` results unless there are hundreds of trials.
 - The Monte Carlo uncertainty of each percentage is roughly plus or minus 1 point.
@@ -239,6 +264,7 @@ For a 90% success rate and a 5-point margin, 4% discordance needs 173 trials per
 `--from comparison.json` plans every gated metric of a pilot comparison from its own data: the baseline rate or the spread (of the paired differences when paired), the discordance of paired 0/1 metrics, the margin as evaluated in the pilot (relative margins at their pilot value), the confidence after any correction, and `min_samples`.
 The assumed true degradation is the pilot's observed one unless `--true-degradation` is given.
 Metrics the pilot could not evaluate, and paired 0/1 metrics whose pilot pairs all agreed, are listed with the reason.
+A pilot with fewer than `min_samples` observations has no interval, which is when planning is needed most; it is planned with the method and confidence the gate would use (the 0/1 method for 0/1 values, the configured confidence after correction).
 
 For continuous metrics (`--stdev`), the planner uses the normal approximation
 
@@ -247,7 +273,7 @@ n = ((z_c + z_p) * sd_diff / |margin - degradation|)^2
 ```
 
 where `z_c` is the normal quantile for the interval level, `z_p` the one for the power, and `sd_diff` the standard deviation of the per-trial difference: the given `--stdev` with `--paired`, otherwise `--stdev` times the square root of 2.
-The engine's bootstrap does not follow this formula exactly, and below about 30 trials its intervals are too narrow (see the table above), so treat small answers with care.
+The engine's bootstrap does not follow this formula exactly, and the difference grows as the number of trials shrinks, so treat small answers with care.
 
 Some reference points at the defaults (confidence 0.95, power 0.8, unpaired):
 

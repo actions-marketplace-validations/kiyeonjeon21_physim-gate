@@ -54,7 +54,9 @@ git cliff --tag v0.2.0 -o CHANGELOG.md
    If the adapter contract still holds, widen the `physim-gate` upper bound in `examples/csv-adapter/pyproject.toml`; the `extras` CI job fails otherwise.
 2. Generate the changelog with git-cliff (above) and commit it.
 3. Tag the commit `vX.Y.Z`, push the tag, and publish a GitHub release for it.
-4. Publishing the release runs `.github/workflows/release.yml`, which builds, checks and tests the distributions and uploads them to PyPI with [trusted publishing](https://docs.pypi.org/trusted-publishers/). No API token is involved.
+4. Publishing the release runs `.github/workflows/release.yml`.
+   It first runs the whole CI workflow on the released commit, then builds, checks and tests the distributions and uploads them to PyPI with [trusted publishing](https://docs.pypi.org/trusted-publishers/).
+   No API token is involved, and nothing is uploaded unless every CI job passes.
 
 Trusted publishing has to be set up once on pypi.org: add a publisher for owner `kiyeonjeon21`, repository `physim-gate`, workflow `release.yml` and environment `pypi`.
 Running the workflow manually publishes to TestPyPI instead, which needs the same setup on test.pypi.org with environment `testpypi`.

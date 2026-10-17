@@ -57,6 +57,25 @@ Everything else is listed for later.
 
 ## P1
 
+All thirteen P1 findings were addressed after v0.3.1, each with a test that fails without the change.
+P1-13 is addressed in the workflows only; branch protection and a required reviewer for the `pypi` environment are repository settings.
+
+| # | Resolution | Tests |
+|---|---|---|
+| P1-1 | Two-sample expansion uses the variance ratio and Welch-Satterthwaite degrees of freedom. Equal samples are unchanged. 10 vs 1,000 trials at the margin: 2.2% and 2.5% per side (1,000 repetitions), new row in the error-rate table | `tests/test_stats.py::test_expanded_bootstrap_matches_welch_width_for_unequal_samples` |
+| P1-2 | A pilot without an interval is planned with the 0/1 method for 0/1 values and with the configured confidence after correction | `tests/test_planning.py::test_plan_from_an_underpowered_pilot_keeps_method_and_confidence` |
+| P1-3 | The action deletes earlier reports before comparing and reads the verdict only for exit codes 0, 1 and 3 | `tests/test_action.py` |
+| P1-4 | No comment for pull requests from forks (a notice instead); a failed comment is a warning, and the verdict step still decides | `tests/test_action.py` |
+| P1-5 | The single-task LeRobot layout needs `-O scenario=<name>` (exit code 2 otherwise) | `tests/test_lerobot.py::test_single_task_layout_needs_a_scenario_name` |
+| P1-6 | A shared trial id with different recorded seeds blocks the comparison, or is a note when every metric is unpaired | `tests/test_integrity.py` |
+| P1-7 | A `failed` run, or a run in which every trial failed, blocks; other failed trials give a note when `physim.failure_rate` is not gated | `tests/test_integrity.py` |
+| P1-8 | A differing scenario version blocks under `require_same_scenario`, including for stored baselines. Simulator versions stay a note, because comparing across them is often the point | `tests/test_integrity.py` |
+| P1-9 | The same file as baseline and candidate is an input error. Identical content from two files is a note, since a deterministic simulator can reproduce a run byte for byte | `tests/test_integrity.py` |
+| P1-10 | Run-level blocking no longer depends on `on_invalid`. A gate where no metric could be compared is `INVALID`; a gate with no required metric says so in its summary | `tests/test_integrity.py` |
+| P1-11 | A relative margin is undefined, like for a zero baseline, when the baseline values have both signs | `tests/test_integrity.py::test_relative_margin_is_invalid_for_values_of_both_signs` |
+| P1-12 | `docs/comparison-semantics.md` explains that constant 0/1 data keeps a wide score interval | Documentation |
+| P1-13 | `release.yml` runs the whole CI workflow on the released commit before building and publishing | Workflow |
+
 ### Confirmed defects
 
 | # | Finding | Where | Suggested fix |
