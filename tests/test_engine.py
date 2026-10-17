@@ -106,7 +106,7 @@ def test_relative_only_margin_with_zero_baseline_is_invalid() -> None:
     zeros = [0.0] * N
     metric, result = compare(zeros, zeros, config=gate(max_relative_degradation=0.1))
     assert metric.verdict is Verdict.INVALID
-    assert "baseline statistic is 0" in metric.reasons[-1]
+    assert "undefined because the baseline is 0" in metric.reasons[-1]
     assert result.verdict is Verdict.INVALID
     assert result.exit_code == 3
 
@@ -346,11 +346,12 @@ def test_empty_runs_are_invalid() -> None:
 
 
 def test_invalid_can_be_allowed_by_policy() -> None:
-    b = make_run({"m": ramp(1)}, run_id="b")
-    c = make_run({"x": ramp(1)}, run_id="c")
-    config = make_config({"m": {"max_absolute_degradation": 1}}, policy={"on_invalid": "pass"})
-    result = compare_runs(b, c, config)
+    b = make_run({"m": ramp(1), "ok": ramp(1)}, run_id="b")
+    c = make_run({"x": ramp(1), "ok": ramp(1)}, run_id="c")
+    metrics = {"m": {"max_absolute_degradation": 1}, "ok": {"max_absolute_degradation": 1}}
+    result = compare_runs(b, c, make_config(metrics, policy={"on_invalid": "pass"}))
     assert result.verdict is Verdict.PASS
+    assert result.metrics[0].verdict is Verdict.INVALID
     assert result.metrics[0].blocking is False
 
 
@@ -373,7 +374,7 @@ def test_optional_metric_regression_does_not_block() -> None:
     assert metric.verdict is Verdict.FAIL
     assert metric.blocking is False
     assert result.verdict is Verdict.PASS
-    assert "non-blocking" in result.summary
+    assert "no metric is required" in result.summary
 
 
 def test_scenario_mismatch_is_invalid_by_default() -> None:

@@ -200,3 +200,173 @@ def test_adapter_calling_sys_exit_is_an_error_not_a_pass(
     assert not out.exists()
     validated = runner.invoke(app, ["validate", "-a", "exiting", str(b)])
     assert validated.exit_code == 2, validated.output
+
+
+# P1: run-level comparability checks found in the v0.3.0 review.
+
+
+def json_compare(tmp_path: Path, baseline: Any, candidate: Any, gate: str = GATE) -> Any:
+    b = write(tmp_path / "b.json", baseline)
+    c = write(tmp_path / "c.json", candidate)
+    g = write(tmp_path / "gate.yaml", gate)
+    result = runner.invoke(app, ["compare", "-b", str(b), "-c", str(c), "-g", str(g), "-f", "json"])
+    assert result.exit_code in (0, 1, 3), result.output
+    return result.exit_code, json.loads(result.stdout)
+
+
+def with_seeds(doc: dict[str, Any], offset: int) -> dict[str, Any]:
+    for i, trial in enumerate(doc["trials"]):
+        trial["seed"] = i + offset
+    return doc
+
+
+def test_shared_trial_ids_with_different_seeds_are_not_comparable(tmp_path: Path) -> None:
+    code, result = json_compare(
+        tmp_path, with_seeds(run_doc("b", VALUES), 0), with_seeds(run_doc("c", VALUES), 100)
+    )
+    assert code == 3
+    assert result["verdict"] == "INVALID"
+    assert any("30 trial ids have different seeds" in i for i in result["run_blocking_issues"])
+    assert any("t0: 0 vs 100" in i for i in result["run_blocking_issues"])
+
+    same, _ = json_compare(
+        tmp_path, with_seeds(run_doc("b", VALUES), 0), with_seeds(run_doc("c", VALUES), 0)
+    )
+    assert same == 0
+    one_sided, _ = json_compare(tmp_path, with_seeds(run_doc("b", VALUES), 0), run_doc("c", VALUES))
+    assert one_sided == 0
+    unpaired = GATE + "    pairing: unpaired\n"
+    code, result = json_compare(
+        tmp_path,
+        with_seeds(run_doc("b", VALUES), 0),
+        with_seeds(run_doc("c", VALUES), 100),
+        unpaired,
+    )
+    assert code == 0
+    assert any("different seeds" in i for i in result["run_issues"])
+
+
+def test_a_failed_run_is_not_comparable(tmp_path: Path) -> None:
+    code, result = json_compare(
+        tmp_path, run_doc("b", VALUES), run_doc("c", VALUES, status="failed")
+    )
+    assert code == 3
+    assert result["run_blocking_issues"] == ["candidate run status is 'failed'"]
+    code, result = json_compare(
+        tmp_path, run_doc("b", VALUES), run_doc("c", VALUES, status="partial")
+    )
+    assert code == 0
+    assert "candidate run status is 'partial'" in result["run_issues"]
+
+
+def test_a_run_in_which_every_trial_failed_is_not_comparable(tmp_path: Path) -> None:
+    candidate = run_doc("c", VALUES)
+    for trial in candidate["trials"]:
+        trial["status"] = "timeout"
+    code, result = json_compare(tmp_path, run_doc("b", VALUES), candidate)
+    assert code == 3
+    assert result["run_blocking_issues"] == [
+        "every candidate trial has a status other than 'ok' (30 of 30)"
+    ]
+
+
+def test_failed_trials_are_pointed_out_when_the_failure_rate_is_not_gated(tmp_path: Path) -> None:
+    candidate = run_doc("c", VALUES)
+    candidate["trials"][0]["status"] = "error"
+    code, result = json_compare(tmp_path, run_doc("b", VALUES), candidate)
+    assert code == 0
+    assert (
+        "1 of 30 candidate trials have a status other than 'ok'; gate physim.failure_rate to "
+        "catch more failures" in result["run_issues"]
+    )
+
+
+def test_a_changed_scenario_version_is_not_comparable(tmp_path: Path) -> None:
+    v1 = run_doc("b", VALUES, scenario={"id": "s", "version": "1"})
+    v2 = run_doc("c", VALUES, scenario={"id": "s", "version": "2"})
+    code, result = json_compare(tmp_path, v1, v2)
+    assert code == 3
+    assert any("scenario version differs" in i for i in result["run_blocking_issues"])
+    code, _ = json_compare(tmp_path, v1, v2, GATE + "policy:\n  require_same_scenario: false\n")
+    assert code == 0
+    unversioned, result = json_compare(tmp_path, v1, run_doc("c", VALUES))
+    assert unversioned == 0
+    assert any("scenario version differs" in i for i in result["run_issues"])
+
+
+def test_a_stored_baseline_of_another_scenario_version_is_not_used_silently(
+    tmp_path: Path,
+) -> None:
+    store = tmp_path / "store"
+    old = write(tmp_path / "old.json", run_doc("b", VALUES, scenario={"id": "s", "version": "1"}))
+    new = write(tmp_path / "new.json", run_doc("c", VALUES, scenario={"id": "s", "version": "2"}))
+    gate = write(tmp_path / "gate.yaml", GATE)
+    saved = runner.invoke(app, ["baseline", "save", str(old), "--store", str(store)])
+    assert saved.exit_code == 0, saved.output
+    result = runner.invoke(
+        app, ["compare", "-b", "@main", "-c", str(new), "-g", str(gate), "--store", str(store)]
+    )
+    assert result.exit_code == 3, result.output
+    assert "scenario version differs" in result.output
+
+
+def test_comparing_a_file_with_itself_is_an_error(tmp_path: Path) -> None:
+    b = write(tmp_path / "b.json", run_doc("b", VALUES))
+    g = write(tmp_path / "gate.yaml", GATE)
+    result = runner.invoke(app, ["compare", "-b", str(b), "-c", str(b), "-g", str(g)])
+    assert result.exit_code == 2, result.output
+    assert "baseline and candidate are the same file" in result.output
+
+
+def test_identical_content_from_two_files_is_a_note(tmp_path: Path) -> None:
+    """A deterministic simulator can reproduce a run byte for byte; that is not an error."""
+    doc = run_doc("b", VALUES)
+    code, result = json_compare(tmp_path, doc, doc)
+    assert code == 0
+    assert any("identical content" in i for i in result["run_issues"])
+
+
+def test_on_invalid_pass_does_not_disable_the_scenario_check(tmp_path: Path) -> None:
+    gate = GATE + "policy:\n  on_invalid: pass\n"
+    other = run_doc("c", VALUES, scenario={"id": "other"})
+    code, result = json_compare(tmp_path, run_doc("b", VALUES), other, gate)
+    assert code == 3
+    assert result["verdict"] == "INVALID"
+
+
+def test_a_gate_cannot_pass_when_no_metric_could_be_compared(tmp_path: Path) -> None:
+    gate = GATE + "policy:\n  on_invalid: pass\n"
+    nulled = run_doc("c", dict.fromkeys(VALUES))
+    code, result = json_compare(tmp_path, run_doc("b", VALUES), nulled, gate)
+    assert code == 3
+    assert result["verdict"] == "INVALID"
+    assert "no gated metric could be compared" in result["summary"]
+
+
+def test_a_gate_without_required_metrics_says_so(tmp_path: Path) -> None:
+    gate = GATE + "    required: false\n"
+    worse = run_doc("c", {k: v + 1 for k, v in VALUES.items()})
+    code, result = json_compare(tmp_path, run_doc("b", VALUES), worse, gate)
+    assert code == 0
+    assert result["metrics"][0]["verdict"] == "FAIL"
+    assert result["summary"].startswith("no metric is required, so nothing blocks the gate")
+
+
+SIGNED = {f"t{i}": (1.0 if i % 2 else -1.0) + 1e-9 for i in range(30)}
+
+
+def test_relative_margin_is_invalid_for_values_of_both_signs(tmp_path: Path) -> None:
+    """A mean near zero of a signed metric gives a meaningless, tiny relative margin."""
+    gate = "version: 1\nmetrics:\n  err:\n    max_relative_degradation: 0.1\n"
+    shifted = run_doc("c", {k: v + 0.01 for k, v in SIGNED.items()})
+    code, result = json_compare(tmp_path, run_doc("b", SIGNED), shifted, gate)
+    assert code == 3
+    metric = result["metrics"][0]
+    assert metric["verdict"] == "INVALID"
+    assert "both signs" in metric["reasons"][-1]
+
+    both = gate + "    max_absolute_degradation: 0.5\n"
+    code, result = json_compare(tmp_path, run_doc("b", SIGNED), shifted, both)
+    assert code == 0
+    assert result["metrics"][0]["numerical"]["margin"] == 0.5
+    assert "both signs" in result["metrics"][0]["numerical"]["margin_basis"]

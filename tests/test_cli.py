@@ -128,8 +128,10 @@ def test_compare_with_lerobot_adapter(tmp_path: Path) -> None:
         "metrics: {success: {max_absolute_degradation: 0.9}, sum_reward: "
         "{max_relative_degradation: 0.5}}\n"
     )
+    rerun = tmp_path / "rerun.json"
+    rerun.write_bytes(real.read_bytes())
     args = ["-a", "lerobot", "-O", "start_seed=1000", "-g", str(gate), "-f", "json"]
-    result = runner.invoke(app, ["compare", "-b", str(real), "-c", str(real), *args])
+    result = runner.invoke(app, ["compare", "-b", str(real), "-c", str(rerun), *args])
     data = json.loads(result.stdout)
     assert [m["pairing"]["mode"] for m in data["metrics"]] == ["paired", "paired"]
     assert data["baseline"]["seeds"] == [1000, 1001, 1002, 1003]

@@ -205,10 +205,15 @@ def _run_comparison(
         baseline_file, base_run = load_baseline(
             cand_run.scenario.id, reference_name(str(baseline)), store
         )
-        baseline_ref = InputRef(path=str(baseline_file), sha256=sha256_path(baseline_file))
     else:
+        baseline_file = baseline
         base_run = _load(adapter, baseline, options)
-        baseline_ref = InputRef(path=str(baseline), sha256=sha256_path(baseline))
+    if baseline_file.resolve() == candidate.resolve():
+        raise InputError(
+            f"baseline and candidate are the same file ({candidate}); a comparison of a run "
+            "with itself always passes"
+        )
+    baseline_ref = InputRef(path=str(baseline_file), sha256=sha256_path(baseline_file))
     inputs = Inputs(
         baseline=baseline_ref,
         candidate=InputRef(path=str(candidate), sha256=sha256_path(candidate)),

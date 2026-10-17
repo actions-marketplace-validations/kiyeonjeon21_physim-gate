@@ -32,7 +32,6 @@ from physim_gate.comparison import (
 )
 from physim_gate.config import (
     BootstrapMethod,
-    Correction,
     GateConfig,
     OnUncertain,
     Pairing,
@@ -83,13 +82,10 @@ def compare_runs(
     generated_at: datetime | None = None,
 ) -> ComparisonResult:
     """Compare two runs under a gate config and return a self-contained result."""
-    run_issues, run_blocking = _check_runs(baseline, candidate, config)
+    run_issues, run_blocking = _check_runs(baseline, candidate, config, inputs)
 
-    confidence_divisor = (
-        len(config.metrics) if config.policy.correction is Correction.BONFERRONI else 1
-    )
     metrics = [
-        _compare_metric(config.resolve(name), baseline, candidate, config, confidence_divisor)
+        _compare_metric(config.resolve(name), baseline, candidate, config)
         for name in config.metrics
     ]
 
@@ -121,25 +117,35 @@ def exit_code_for(verdict: Verdict) -> ExitCode:
 
 
 def _check_runs(
-    baseline: RunResult, candidate: RunResult, config: GateConfig
+    baseline: RunResult, candidate: RunResult, config: GateConfig, inputs: Inputs | None
 ) -> tuple[list[str], list[str]]:
+    """Run-level comparability checks.
+
+    Blocking issues make the overall verdict INVALID whatever ``policy.on_invalid`` says: that
+    setting tolerates metrics that cannot be compared, not runs that cannot be compared.
+    """
     issues: list[str] = []
     blocking: list[str] = []
+    same_scenario = config.policy.require_same_scenario
 
     if baseline.scenario.id != candidate.scenario.id:
         message = (
             f"scenario differs: baseline {baseline.scenario.id!r}, "
             f"candidate {candidate.scenario.id!r}"
         )
-        if config.policy.require_same_scenario and config.policy.on_invalid is OnUncertain.FAIL:
+        if same_scenario:
             blocking.append(message + " (policy.require_same_scenario is true)")
         else:
             issues.append(message)
     elif baseline.scenario.version != candidate.scenario.version:
-        issues.append(
+        message = (
             f"scenario version differs: {baseline.scenario.version!r} vs "
             f"{candidate.scenario.version!r}"
         )
+        if same_scenario and None not in (baseline.scenario.version, candidate.scenario.version):
+            blocking.append(message + " (policy.require_same_scenario is true)")
+        else:
+            issues.append(message)
     if baseline.domain != candidate.domain:
         issues.append(f"domain differs: {baseline.domain.value} vs {candidate.domain.value}")
     if baseline.simulator.name != candidate.simulator.name:
@@ -153,10 +159,58 @@ def _check_runs(
         )
     if baseline.run_id == candidate.run_id:
         issues.append(f"baseline and candidate share run_id {baseline.run_id!r}")
+    if (
+        inputs is not None
+        and inputs.baseline.sha256 is not None
+        and inputs.baseline.sha256 == inputs.candidate.sha256
+    ):
+        issues.append(
+            "baseline and candidate inputs have identical content; expected only from a "
+            "deterministic simulator and a change that does not affect it"
+        )
+
+    gates_failures = FAILURE_RATE_METRIC in config.metrics
     for label, run in (("baseline", baseline), ("candidate", candidate)):
-        if run.status is not RunStatus.COMPLETED:
+        if run.status is RunStatus.FAILED:
+            blocking.append(f"{label} run status is 'failed'")
+        elif run.status is not RunStatus.COMPLETED:
             issues.append(f"{label} run status is {run.status.value!r}")
+        not_ok = sum(1 for t in run.trials if t.status is not TrialStatus.OK)
+        if run.trials and not_ok == len(run.trials):
+            blocking.append(
+                f"every {label} trial has a status other than 'ok' ({not_ok} of {not_ok})"
+            )
+        elif not_ok and not gates_failures:
+            issues.append(
+                f"{not_ok} of {len(run.trials)} {label} trials have a status other than 'ok'; "
+                f"gate {FAILURE_RATE_METRIC} to catch more failures"
+            )
+
+    seeds = _seed_conflicts(baseline, candidate)
+    if seeds:
+        examples = ", ".join(f"{k}: {b} vs {c}" for k, b, c in seeds[:3])
+        message = (
+            f"{len(seeds)} trial ids have different seeds in the two runs ({examples}), so "
+            "they do not name the same conditions"
+        )
+        unpaired = all(config.resolve(name).pairing is Pairing.UNPAIRED for name in config.metrics)
+        if unpaired:
+            issues.append(message + "; every metric is compared unpaired")
+        else:
+            blocking.append(message)
     return issues, blocking
+
+
+def _seed_conflicts(baseline: RunResult, candidate: RunResult) -> list[tuple[str, int, int]]:
+    """Shared trial ids whose recorded seeds differ, in baseline order."""
+    candidate_seeds = {t.trial_id: t.seed for t in candidate.trials if t.seed is not None}
+    return [
+        (t.trial_id, t.seed, other)
+        for t in baseline.trials
+        if t.seed is not None
+        and (other := candidate_seeds.get(t.trial_id)) is not None
+        and other != t.seed
+    ]
 
 
 def _compare_metric(
@@ -164,9 +218,8 @@ def _compare_metric(
     baseline: RunResult,
     candidate: RunResult,
     config: GateConfig,
-    confidence_divisor: int,
 ) -> MetricComparison:
-    adjusted_confidence = 1.0 - (1.0 - gate.confidence) / confidence_divisor
+    adjusted_confidence = config.adjusted_confidence(gate.name)
     base = {
         "name": gate.name,
         "required": gate.required,
@@ -202,7 +255,7 @@ def _compare_metric(
     degradation = sign * (c_stat - b_stat)
 
     try:
-        margin_fn, margin_basis = _margin(gate, b_stat)
+        margin_fn, margin_basis = _margin(gate, b_stat, samples.baseline)
     except _Invalid as exc:
         return _finish(
             base,
@@ -452,18 +505,28 @@ def _collect_samples(
     )
 
 
-def _margin(gate: ResolvedMetricGate, b_stat: float) -> tuple[Callable[[float], float], str]:
+def _margin(
+    gate: ResolvedMetricGate, b_stat: float, baseline: list[float]
+) -> tuple[Callable[[float], float], str]:
     absolute = gate.max_absolute_degradation
     relative = gate.max_relative_degradation
-    if relative is not None and b_stat == 0:
+    # A relative margin needs a ratio scale. When the baseline is 0, or its values have both
+    # signs (a signed error, say), a fraction of |baseline| is 0 or arbitrarily close to it.
+    if b_stat == 0:
+        undefined = "the baseline is 0"
+    elif min(baseline) < 0 < max(baseline):
+        undefined = "the baseline values have both signs"
+    else:
+        undefined = None
+    if relative is not None and undefined is not None:
         if absolute is None:
             raise _Invalid(
-                "the baseline statistic is 0, so max_relative_degradation is undefined; "
+                f"max_relative_degradation is undefined because {undefined}; "
                 "add max_absolute_degradation for this metric"
             )
         return (
             lambda _b: absolute,
-            "absolute (the relative threshold is undefined because the baseline is 0)",
+            f"absolute (the relative threshold is undefined because {undefined})",
         )
     if relative is None:
         assert absolute is not None
@@ -518,6 +581,12 @@ def _overall(metrics: list[MetricComparison], run_blocking: list[str]) -> tuple[
     total = len(metrics)
     if run_blocking:
         return Verdict.INVALID, "runs are not comparable: " + "; ".join(run_blocking)
+    if all(m.verdict is Verdict.INVALID for m in metrics):
+        # Whatever policy.on_invalid and required say, a gate that compared nothing has
+        # shown nothing.
+        return Verdict.INVALID, (
+            f"no gated metric could be compared: {', '.join(m.name for m in metrics)}"
+        )
     if failed:
         return Verdict.FAIL, (
             f"regression detected in {len(failed)} of {total} gated metrics: {', '.join(failed)}"
@@ -532,6 +601,9 @@ def _overall(metrics: list[MetricComparison], run_blocking: list[str]) -> tuple[
             f"{total} gated metrics: {', '.join(uncertain)}"
         )
     warned = [m.name for m in metrics if m.verdict is not Verdict.PASS]
+    if not any(m.required for m in metrics):
+        detail = f"findings for: {', '.join(warned)}" if warned else "every metric passed"
+        return Verdict.PASS, f"no metric is required, so nothing blocks the gate; {detail}"
     if warned:
         return Verdict.PASS, (
             f"no blocking regression; non-blocking findings for: {', '.join(warned)}"
